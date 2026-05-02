@@ -49,6 +49,8 @@ A poisoned alert drives the unhardened Remediation agent to drop a `tickets` tab
 - An F5 AI Security (CalypsoAI) tenant token
 - Companion lab recommended first: [`mcp-server-lab`](../mcp-server-lab/README.md)
 
+> **Setting up your environment** — see [`SETUP.md`](./SETUP.md) for the full topology, hardware/OS/network requirements, and step-by-step setup instructions for both **self-paced learners** and **lab owners/instructors** (per-learner tokens, room WiFi, pre-flight checklist).
+
 ## Quick start
 
 > Most services are still being built (see [`PRD.md`](./PRD.md) §10). The **Triage agent vertical slice** is wired up — it proves end-to-end that LLM traffic flows through the F5 AI Security (CalypsoAI) proxy and that BYOA / Agentic Fingerprints sees a session-tagged trail.
