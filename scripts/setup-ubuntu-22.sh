@@ -59,22 +59,24 @@ else
   die "Cannot read /etc/os-release — is this really Ubuntu?"
 fi
 
-# Decide whether we need sudo. Inside cloud-init / Packer the
-# script often already runs as root.
+# Decide whether we need sudo. Inside cloud-init / Packer / `sudo -i`
+# the script often runs as root with USER and SUDO_USER unset, so we
+# need careful fallbacks to keep `set -u` happy.
 if [[ $EUID -eq 0 ]]; then
   SUDO=""
-  TARGET_USER="${SUDO_USER:-${USER}}"
+  # Preference order: the user who invoked sudo, the current $USER,
+  # then the standard Ubuntu cloud user.
+  TARGET_USER="${SUDO_USER:-${USER:-ubuntu}}"
+  # If that user does not actually exist on this host, fall back to
+  # root and we will skip the docker group step entirely.
+  if ! id -u "$TARGET_USER" >/dev/null 2>&1; then
+    warn "User '${TARGET_USER}' does not exist on this host; docker group step will be skipped."
+    TARGET_USER="root"
+  fi
 else
   SUDO="sudo"
-  TARGET_USER="${USER}"
+  TARGET_USER="${USER:-$(id -un)}"
   command -v sudo >/dev/null 2>&1 || die "sudo is required when not running as root"
-fi
-
-# Ubuntu's first-boot user can be `ubuntu`; if we are running
-# as root with no SUDO_USER, fall back to that — otherwise the
-# `docker` group membership step is a no-op.
-if [[ "$TARGET_USER" == "root" && -n "${SUDO_USER:-}" ]]; then
-  TARGET_USER="$SUDO_USER"
 fi
 
 log "Target user for docker group membership: ${TARGET_USER}"
@@ -130,7 +132,9 @@ else
 fi
 
 # --- Step 3: docker group membership -----------------------
-if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+if [[ "$TARGET_USER" == "root" ]]; then
+  ok "Running as root with no non-root user identified; skipping docker group membership."
+elif id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
   ok "User '${TARGET_USER}' is already in the docker group."
 else
   log "Adding '${TARGET_USER}' to the docker group…"
