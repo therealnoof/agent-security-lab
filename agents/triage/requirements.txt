@@ -1,0 +1,9 @@
+# Triage agent — dependencies
+# ────────────────────────────────────────────────────────────
+# openai : the OpenAI Python SDK is what we point at the
+#          CalypsoAI OpenAI-compatible proxy. The base_url
+#          and api_key are swapped in via env vars; the
+#          x-cai-metadata-session-id header is attached via
+#          default_headers. No actual OpenAI key is used.
+# ────────────────────────────────────────────────────────────
+openai>=1.50.0

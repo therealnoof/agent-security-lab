@@ -88,6 +88,10 @@ services:
   # CalypsoAI proxy with a per-agent session ID; authenticate to
   # MCP / A2A endpoints with Keycloak-issued tokens.
 
+  # Triage has no tools (planner only) — no MCP, no DB, no OAuth.
+  # That makes it the right vertical-slice target: it isolates the
+  # CalypsoAI BYOA wiring from every other dependency.
+  # Run with: `docker compose run --rm triage`
   triage:
     build:
       context: ./agents/triage
@@ -98,11 +102,8 @@ services:
       - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
       - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
       - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
-    depends_on:
-      keycloak:
-        condition: service_healthy
-    restart: unless-stopped
+      - ALERT_TEXT=${ALERT_TEXT:-}
+    restart: "no"
 
   threat-intel:
     build:
