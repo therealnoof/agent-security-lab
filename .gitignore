@@ -1,0 +1,41 @@
+# --- Secrets & local config ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+keycloak/exports/local/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Docker / runtime state ---
+*.log
+logs/
+postgres-data/
+keycloak-data/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Lab artifacts ---
+agent-logs/
+session-traces/
+*.bak

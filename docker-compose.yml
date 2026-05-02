@@ -1,0 +1,173 @@
+# =============================================================
+#  agent-security-lab — service wiring (SCAFFOLD)
+# =============================================================
+#  This compose file lays out the topology described in PRD.md §7.
+#  Service images and build contexts are placeholders until the
+#  agent code, MCP server extensions, and Keycloak realm export
+#  are committed.
+#
+#  Topology:
+#    keycloak    — OAuth 2.1 IdP, issues per-agent tokens
+#    postgres    — Sandbox "tickets" DB (the destructive demo target)
+#    mcp-server  — Extended SOC + remediation tools, OAuth-scoped
+#    triage      — Planner agent
+#    threat-intel
+#    remediation — Holds destructive MCP tools
+#    comms       — Slack/email notifications (mocked)
+#    approver    — A2A endpoint that gates destructive actions
+#
+#  All agents call the F5 AI Security (CalypsoAI) OpenAI-compatible
+#  proxy for LLM inference. Each agent passes a unique
+#  x-cai-metadata-session-id so Agentic Fingerprints can show
+#  per-agent chain-of-thought trails.
+# =============================================================
+
+services:
+
+  # ─── IdP ───────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: asl-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo done"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ─── Sandbox DB (the destructive-demo target) ─────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: asl-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── MCP Server (extended SOC + remediation tools) ────────
+  mcp-server:
+    build:
+      context: ./mcp_server
+    container_name: asl-mcp-server
+    environment:
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Agents ────────────────────────────────────────────────
+  # All agents share the same shape: route LLM calls through the
+  # CalypsoAI proxy with a per-agent session ID; authenticate to
+  # MCP / A2A endpoints with Keycloak-issued tokens.
+
+  triage:
+    build:
+      context: ./agents/triage
+    container_name: asl-triage
+    environment:
+      - AGENT_NAME=triage
+      - LAB_RUN_ID=${LAB_RUN_ID}
+      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
+      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
+      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  threat-intel:
+    build:
+      context: ./agents/threat_intel
+    container_name: asl-threat-intel
+    environment:
+      - AGENT_NAME=threat-intel
+      - LAB_RUN_ID=${LAB_RUN_ID}
+      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
+      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
+      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - MCP_SERVER_URL=http://mcp-server:8000
+    depends_on:
+      mcp-server:
+        condition: service_started
+    restart: unless-stopped
+
+  remediation:
+    build:
+      context: ./agents/remediation
+    container_name: asl-remediation
+    environment:
+      - AGENT_NAME=remediation
+      - LAB_RUN_ID=${LAB_RUN_ID}
+      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
+      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
+      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - MCP_SERVER_URL=http://mcp-server:8000
+      - APPROVER_A2A_URL=http://approver:9000
+    depends_on:
+      mcp-server:
+        condition: service_started
+      approver:
+        condition: service_started
+    restart: unless-stopped
+
+  comms:
+    build:
+      context: ./agents/comms
+    container_name: asl-comms
+    environment:
+      - AGENT_NAME=comms
+      - LAB_RUN_ID=${LAB_RUN_ID}
+      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
+      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
+      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+    restart: unless-stopped
+
+  approver:
+    build:
+      context: ./agents/approver
+    container_name: asl-approver
+    environment:
+      - AGENT_NAME=approver
+      - LAB_RUN_ID=${LAB_RUN_ID}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+volumes:
+  keycloak-data:
+    driver: local
+  postgres-data:
+    driver: local
