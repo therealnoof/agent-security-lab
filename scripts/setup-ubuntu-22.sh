@@ -84,7 +84,7 @@ log "Target user for docker group membership: ${TARGET_USER}"
 # --- Step 1: apt update + core utilities -------------------
 log "Updating apt cache and installing core utilities…"
 $SUDO apt-get update -y
-$SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y \
+$SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   ca-certificates \
   curl \
   git \
@@ -120,7 +120,7 @@ else
     $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
 
   $SUDO apt-get update -y
-  $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     docker-ce \
     docker-ce-cli \
     containerd.io \
