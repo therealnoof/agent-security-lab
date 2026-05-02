@@ -126,7 +126,14 @@ You have a laptop, an internet connection, and a CalypsoAI token from your instr
 ### A1. Install prerequisites
 
 - macOS / Windows: install **Docker Desktop** → <https://www.docker.com/products/docker-desktop>
-- Ubuntu: install Docker Engine + Compose plugin → <https://docs.docker.com/engine/install/ubuntu/>
+- Ubuntu 22.04 / 24.04: run the bootstrap script in this repo (installs Docker Engine + Compose, adds you to the docker group, pre-pulls lab images):
+
+  ```bash
+  bash scripts/setup-ubuntu-22.sh
+  # then log out and back in (or `newgrp docker`)
+  ```
+
+  If you prefer to install manually, follow <https://docs.docker.com/engine/install/ubuntu/>.
 
 Verify:
 
@@ -263,9 +270,14 @@ If any of these fail, fix before the room opens.
 
 Some venues require attendees to use loaner laptops or cloud VMs. If you go that route:
 
-- **Per-learner cloud VM**: any 2 vCPU / 8 GB / 20 GB Linux VM (AWS `t3.large`, Azure `B2s`, GCP `e2-standard-2`). Allow outbound 443. No inbound from internet — learners SSH from a jump host or use the cloud's web console.
+- **Per-learner cloud VM**: any 2 vCPU / 8 GB / 20 GB Ubuntu 22.04 (or 24.04) VM (AWS `t3.large`, Azure `B2s`, GCP `e2-standard-2`). Allow outbound 443. No inbound from internet — learners SSH from a jump host or use the cloud's web console.
+- **Bootstrap each VM** with the repo's [`scripts/setup-ubuntu-22.sh`](./scripts/setup-ubuntu-22.sh). It is idempotent and pre-pulls the lab images, so first `compose run` on a fresh VM is fast.
+  ```bash
+  curl -fsSL <repo-raw-url>/scripts/setup-ubuntu-22.sh -o setup.sh
+  bash setup.sh
+  ```
 - **Bastion / jump host**: optional; one small VM where learners `ssh` into their own VM. Avoids opening SSH to the whole world.
-- **Image baking**: build a snapshot/AMI with Docker, the repo cloned, and images pre-pulled. Booting a fresh VM per learner from this snapshot is the fastest path to "ready."
+- **Image baking**: run the bootstrap script during Packer/cloud-init image build, then snapshot. Booting a fresh VM per learner from that snapshot is the fastest path to "ready."
 
 Cost benchmark (rough): ~$0.10/learner/hour on most clouds. A 4-hour workshop for 30 learners ≈ $12.
 
