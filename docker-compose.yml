@@ -88,6 +88,17 @@ services:
   # CalypsoAI proxy with a per-agent session ID; authenticate to
   # MCP / A2A endpoints with Keycloak-issued tokens.
 
+  # ─── Agents ────────────────────────────────────────────────
+  # All agents inject `.env` directly via `env_file:` instead of
+  # interpolating ${VAR} into the `environment:` block. Reason:
+  # `${VAR}` interpolation reads the SHELL env first and falls
+  # back to .env, so a stale `set -a; source .env` from earlier
+  # in the session silently wins over an updated .env. Using
+  # `env_file:` reads the file at container start every time.
+  # Per-service overrides (AGENT_NAME, MCP/A2A URLs) stay in
+  # `environment:` because they are intrinsic to the service,
+  # not learner config.
+
   # Triage has no tools (planner only) — no MCP, no DB, no OAuth.
   # That makes it the right vertical-slice target: it isolates the
   # CalypsoAI BYOA wiring from every other dependency.
@@ -96,26 +107,23 @@ services:
     build:
       context: ./agents/triage
     container_name: asl-triage
+    env_file:
+      - path: .env
+        required: false
     environment:
       - AGENT_NAME=triage
-      - LAB_RUN_ID=${LAB_RUN_ID}
-      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
-      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
-      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
-      - ALERT_TEXT=${ALERT_TEXT:-}
     restart: "no"
 
   threat-intel:
     build:
       context: ./agents/threat_intel
     container_name: asl-threat-intel
+    env_file:
+      - path: .env
+        required: false
     environment:
       - AGENT_NAME=threat-intel
-      - LAB_RUN_ID=${LAB_RUN_ID}
-      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
-      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
-      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
       - MCP_SERVER_URL=http://mcp-server:8000
     depends_on:
       mcp-server:
@@ -126,13 +134,12 @@ services:
     build:
       context: ./agents/remediation
     container_name: asl-remediation
+    env_file:
+      - path: .env
+        required: false
     environment:
       - AGENT_NAME=remediation
-      - LAB_RUN_ID=${LAB_RUN_ID}
-      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
-      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
-      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
       - MCP_SERVER_URL=http://mcp-server:8000
       - APPROVER_A2A_URL=http://approver:9000
     depends_on:
@@ -146,23 +153,24 @@ services:
     build:
       context: ./agents/comms
     container_name: asl-comms
+    env_file:
+      - path: .env
+        required: false
     environment:
       - AGENT_NAME=comms
-      - LAB_RUN_ID=${LAB_RUN_ID}
-      - CALYPSOAI_TOKEN=${CALYPSOAI_TOKEN}
-      - CALYPSOAI_OPENAI_API_BASE=${CALYPSOAI_OPENAI_API_BASE}
-      - CALYPSOAI_MODEL=${CALYPSOAI_MODEL}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
     restart: unless-stopped
 
   approver:
     build:
       context: ./agents/approver
     container_name: asl-approver
+    env_file:
+      - path: .env
+        required: false
     environment:
       - AGENT_NAME=approver
-      - LAB_RUN_ID=${LAB_RUN_ID}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
     ports:
       - "9000:9000"
     restart: unless-stopped
