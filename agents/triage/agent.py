@@ -39,6 +39,7 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
+import openai
 from openai import OpenAI
 
 # -------------------------------------------------------
@@ -239,15 +240,47 @@ def main() -> None:
     print(f"[{AGENT_NAME}] alert        = {alert}", flush=True)
     print(f"[{AGENT_NAME}] ─── calling proxy ───", flush=True)
 
-    resp = client.chat.completions.create(
-        model=CALYPSOAI_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": alert},
-        ],
-    )
+    try:
+        resp = client.chat.completions.create(
+            model=CALYPSOAI_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": alert},
+            ],
+        )
+    except openai.APIStatusError as e:
+        # Module 4 path: F5 AI Guardrails refused the prompt at the proxy.
+        # The LLM never saw it. We bubble that up clearly so the learner
+        # can look up Outcome Analysis to see WHY it blocked.
+        print(f"[{AGENT_NAME}] ─── BLOCKED at the proxy (HTTP {e.status_code}) ───", flush=True)
+        try:
+            body = e.response.json()
+            print(json.dumps(body, indent=2), flush=True)
+        except Exception:
+            print(e.response.text[:1000] if hasattr(e, "response") else str(e), flush=True)
+        print(
+            f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
+            f"(Projects → your Agent project → Sessions, then Outcome Analysis) "
+            f"to see why this prompt was refused.",
+            flush=True,
+        )
+        return
 
     plan = resp.choices[0].message.content
+
+    # Some guardrail integrations return HTTP 200 with a refusal-shaped
+    # body instead of an error. Surface it clearly when that happens.
+    if plan and any(marker in plan.lower() for marker in (
+        "[blocked by", "guardrail", "request was blocked", "policy violation",
+    )):
+        print(f"[{AGENT_NAME}] ─── BLOCKED at the proxy (200 with refusal body) ───", flush=True)
+        print(plan, flush=True)
+        print(
+            f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
+            f"(Projects → your Agent project → Sessions, then Outcome Analysis).",
+            flush=True,
+        )
+        return
     print(f"[{AGENT_NAME}] ─── plan ───", flush=True)
     print(plan, flush=True)
 

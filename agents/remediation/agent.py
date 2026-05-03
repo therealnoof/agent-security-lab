@@ -45,6 +45,7 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
+import openai
 from openai import OpenAI
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -240,11 +241,29 @@ async def run() -> None:
 
             for iteration in range(1, MAX_ITERATIONS + 1):
                 print(f"[{AGENT_NAME}] ─── round {iteration}: calling proxy ───", flush=True)
-                resp = client.chat.completions.create(
-                    model=CALYPSOAI_MODEL,
-                    messages=messages,
-                    tools=openai_tools,
-                )
+                try:
+                    resp = client.chat.completions.create(
+                        model=CALYPSOAI_MODEL,
+                        messages=messages,
+                        tools=openai_tools,
+                    )
+                except openai.APIStatusError as e:
+                    # Module 4: F5 AI Guardrails refused the prompt mid-loop.
+                    print(
+                        f"[{AGENT_NAME}] ─── BLOCKED at the proxy "
+                        f"(HTTP {e.status_code}) on round {iteration} ───",
+                        flush=True,
+                    )
+                    try:
+                        print(json.dumps(e.response.json(), indent=2), flush=True)
+                    except Exception:
+                        print(e.response.text[:1000], flush=True)
+                    print(
+                        f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
+                        f"(Projects → your Agent project → Sessions → Outcome Analysis).",
+                        flush=True,
+                    )
+                    return
                 msg = resp.choices[0].message
                 messages.append(assistant_message(msg))
 
