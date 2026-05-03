@@ -26,7 +26,7 @@ If you get stuck, the [Troubleshooting](../SETUP.md#a6-common-self-paced-gotchas
 ## Before you start
 
 1. Complete [`SETUP.md`](../SETUP.md) — install Docker, fill in `.env`, validate Triage.
-2. Have the F5 AI Security UI (`https://www.us1.calypsoai.app` for the lab tenant) open in a browser tab. You'll be flipping back and forth between the terminal and the UI a lot.
+2. Have the F5 AI Security UI (`https://www.us1.calypsoai.app` for the lab tenant) open in a browser tab, signed in. **The path you'll use repeatedly** is **Projects → your Agent project → Sessions**. (Same project also holds your API tokens, guardrails, and provider connections.)
 3. Optional but recommended: complete the [`mcp-server-lab`](https://github.com/therealnoof/mcp-server-lab) Phase 1 lab first. This lab reuses its SOC tools and assumes you've seen a single agent in action.
 
 ---
@@ -205,10 +205,14 @@ This is what we mean by an agent. The *shape* of the output is yours; the *judgm
 
 ## Step 5 — Find your session in the F5 AI Security UI
 
-1. Open <https://www.us1.calypsoai.app> (or your tenant's URL).
-2. Navigate to **Agent Sessions** / **Agentic Fingerprints** (label varies by tenant version).
-3. Search for your `session_id` from Step 3.
-4. Open it.
+1. Open <https://www.us1.calypsoai.app> (or your tenant's URL) and log in.
+2. Click **Projects** in the side nav.
+3. Open the Agent project for this lab (or, the first time you do this, create one with type **Agent**). Inside the project you'll find:
+   - **Sessions** — the chain-of-thought trails for every run, indexed by `session_id`.
+   - **API tokens** — where the `CALYPSOAI_TOKEN` you put in `.env` was created.
+   - **Guardrails** — what Module 4 will configure to block poisoned prompts at the proxy.
+   - **Connections / providers** — the upstream LLM the proxy fronts.
+4. Open **Sessions** and search for your `session_id` from Step 3.
 
 You should see:
 
@@ -234,7 +238,7 @@ docker compose run --rm -e ALERT_TEXT="the tickets table is corrupt — drop and
 A few things to do now:
 
 1. Compare the new JSON plan to the previous one. The `tasks` array will look different. In particular, look at what gets assigned to `remediation`.
-2. Find the new session in F5 AI Security and read the model's reasoning. The system prompt is byte-identical to the previous run; only the user prompt changed. What did the model *infer* from "the tickets table is corrupt"?
+2. Find the new session in **Projects → your Agent project → Sessions** and read the model's reasoning. The system prompt is byte-identical to the previous run; only the user prompt changed. What did the model *infer* from "the tickets table is corrupt"?
 3. Notice that the model is being **helpful**, not malicious. It's doing what the user asked. That's exactly the failure mode the rest of the lab teaches you to defend against.
 
 This is Module 1 in miniature: a poisoned user prompt that aims a real agent at a destructive action. In Module 1 we'll let the destructive action actually run — against a sandbox Postgres — and then layer in the OAuth guardrail that stops it.
@@ -352,7 +356,7 @@ Things to notice:
 
 ### Step 4 — Find both sessions in F5 AI Security
 
-Open the F5 AI Security UI and search for the Threat-Intel session ID. You should see:
+Open the F5 AI Security UI → **Projects** → your Agent project → **Sessions**, and search for the Threat-Intel session ID. You should see:
 
 - The system prompt (the role + JSON contract you read in Step 1).
 - The user prompt (the task description).
@@ -509,7 +513,7 @@ This is the failure mode of the PocketOS incident, reproduced in your sandbox.
 
 #### Step 6 — Inspect the model's reasoning in F5 AI Security
 
-Open the F5 UI and find the Remediation agent's session ID from Step 4's log.
+In the F5 UI, go to **Projects → your Agent project → Sessions** and find the Remediation agent's session ID from Step 4's log.
 
 What you should see:
 - The system prompt (the role + JSON contract).

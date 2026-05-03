@@ -63,7 +63,7 @@ docker compose build triage
 docker compose run --rm triage
 ```
 
-You should see the agent print its `session_id`, the alert it received, and a JSON plan. Copy that `session_id` and look it up in the F5 AI Security UI — you should see the system prompt, the alert, and the model's reasoning for that specific run.
+You should see the agent print its `session_id`, the alert it received, and a JSON plan. Copy that `session_id` and look it up in the F5 AI Security UI under **Projects → your Agent project → Sessions** — you should see the system prompt, the alert, and the model's reasoning for that specific run.
 
 To send your own alert text (Module 1 will use this to deliver the poisoned alert):
 

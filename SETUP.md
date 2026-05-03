@@ -162,7 +162,7 @@ Open `.env` and fill in **at minimum**:
 
 | Variable | Where to get it |
 |---|---|
-| `CALYPSOAI_TOKEN` | F5 AI Security UI → API tokens, or your instructor |
+| `CALYPSOAI_TOKEN` | F5 AI Security UI → **Projects → your Agent project → API tokens** (or get one from your instructor). API tokens are scoped to a single Agent project; the same project also owns the sessions, guardrails, and provider connections you'll use throughout the lab. |
 | `CALYPSOAI_OPENAI_API_BASE` | `https://www.<region>.calypsoai.app/openai/<PROVIDER-NAME>` — see note below |
 | `CALYPSOAI_MODEL` | The model id the provider exposes (e.g., `gemini-2.5-flash`, `gpt-4o-mini`) |
 
@@ -216,7 +216,7 @@ Expected output (last line is the important one):
 [triage] ─── done. Look up session local-triage-... in F5 AI Security ───
 ```
 
-Copy that `session_id` and look it up in the F5 AI Security UI. If you see the prompt, alert, and model response under that session, the BYOA wiring is good and you are ready for Module 1.
+Copy that `session_id` and look it up in the F5 AI Security UI: **Projects → your Agent project → Sessions**, then search by id. If you see the prompt, alert, and model response under that session, the BYOA wiring is good and you are ready for Module 1.
 
 ### A5. Bring up the rest (later modules)
 
@@ -257,11 +257,12 @@ Your job is to make sure 10–30 learners can each get to a working Module 0 wit
 
 The tenant is already provisioned (per stakeholder). You need to:
 
-1. **Create per-learner API tokens** in the F5 AI Security UI. One token per learner. Give each a recognizable name (e.g., `lab-2026-05-02-learner-07`) and the lowest scope that still lets them call the OpenAI-compatible proxy and read their own session traces.
-2. **Note the OpenAI-compatible base URL** for the tenant. It goes in every learner's `.env`.
-3. **Pick a default model** the tenant exposes that supports tool calling and has reasonable rate limits (e.g., `gpt-4o-mini`). Document the choice.
-4. **Pre-load module policy templates** (when they ship in `policies/`). Module 4's input scanner needs to be enabled in the tenant before learners reach it.
-5. **Set a tenant-side rate limit per token** so one learner cannot starve the rest. Match it to a comfortable per-module budget (TBD as we benchmark; placeholder: 200 LLM calls / hour / learner).
+1. **Create one Agent project per learner cohort** (or per learner if isolation matters): UI → **Projects → New Project → type: Agent**. The project is the unit of scoping in Calypso — it owns the sessions, the API tokens, the guardrails, and the provider connections.
+2. **Create per-learner API tokens** inside that project: **Projects → your Agent project → API tokens**. One per learner. Give each a recognizable name (e.g., `lab-2026-05-02-learner-07`) and the lowest scope that still lets them call the OpenAI-compatible proxy and read their own session traces.
+3. **Note the OpenAI-compatible base URL** for the tenant + the provider name configured on this project. It goes in every learner's `.env` as `CALYPSOAI_OPENAI_API_BASE=https://www.<region>.calypsoai.app/openai/<PROVIDER-NAME>`.
+4. **Pick a default model** the configured provider exposes that supports tool calling and has reasonable rate limits (e.g., `gpt-4o-mini`, `gemini-2.5-flash`). Document the choice.
+5. **Pre-load module policy templates** (when they ship in `policies/`). Module 4's input scanner is configured under **Projects → your Agent project → Guardrails** before learners reach it.
+6. **Set a tenant-side rate limit per token** so one learner cannot starve the rest. Match it to a comfortable per-module budget (TBD as we benchmark; placeholder: 200 LLM calls / hour / learner).
 
 ### B2. Repo & artifact prep
 
