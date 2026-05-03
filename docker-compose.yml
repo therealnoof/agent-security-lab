@@ -112,6 +112,12 @@ services:
         required: false
     environment:
       - AGENT_NAME=triage
+      # ALERT_TEXT is an intentional per-run override: setting it in the
+      # caller's shell is the natural way to swap in a poisoned alert
+      # (Module 1) without editing .env. Interpolating it here is safe —
+      # the failure mode is "you forgot you exported it", not the silent
+      # stale-config problem we hit with the CalypsoAI vars.
+      - ALERT_TEXT=${ALERT_TEXT:-}
     restart: "no"
 
   threat-intel:
