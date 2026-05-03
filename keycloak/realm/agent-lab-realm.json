@@ -78,6 +78,34 @@
       "implicitFlowEnabled": false,
       "defaultClientScopes": ["mcp:read"],
       "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-triage",
+      "name": "Triage agent",
+      "description": "Service-account client for the Triage planner. Used to call other agents over A2A; identity-based authorization is enforced by each receiver's agent-card.json.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-triage-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-comms",
+      "name": "Comms agent (resource server)",
+      "description": "Comms uses this client's secret to call Keycloak's introspection endpoint when validating bearer tokens from incoming A2A calls.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-comms-secret-change-me",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false
     }
   ]
 }

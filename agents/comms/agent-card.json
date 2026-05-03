@@ -1,0 +1,40 @@
+{
+  "name": "comms-agent",
+  "version": "1.0",
+  "description": "Sends notifications on behalf of the SOC IR team. Internal Slack and external email.",
+  "endpoint_base": "/a2a/skills",
+  "skills": [
+    {
+      "id": "notify-internal",
+      "description": "Post a message to the SOC team's internal Slack channel. Stays inside the trust boundary.",
+      "input_schema": {
+        "channel": "string  (e.g. '#soc-ops')",
+        "subject": "string",
+        "body":    "string"
+      },
+      "side_effects": ["internal-message"],
+      "destructive": false,
+      "approval_required": false,
+      "allowed_callers": [
+        "agent-triage",
+        "agent-remediation",
+        "agent-threat-intel"
+      ]
+    },
+    {
+      "id": "notify-external",
+      "description": "Send an email to a recipient OUTSIDE the organization. Data egress; treat as destructive.",
+      "input_schema": {
+        "to":      "string  (external email address)",
+        "subject": "string",
+        "body":    "string"
+      },
+      "side_effects": ["external-email", "data-egress"],
+      "destructive": true,
+      "approval_required": true,
+      "allowed_callers": [
+        "agent-approver-attested"
+      ]
+    }
+  ]
+}

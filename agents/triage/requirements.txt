@@ -7,3 +7,6 @@
 #          default_headers. No actual OpenAI key is used.
 # ────────────────────────────────────────────────────────────
 openai>=1.50.0
+# httpx (Module 3) — Triage uses it to fetch its OAuth token from
+# Keycloak and to dispatch A2A calls to other agents.
+httpx>=0.27.0

@@ -143,6 +143,16 @@ services:
       # the failure mode is "you forgot you exported it", not the silent
       # stale-config problem we hit with the CalypsoAI vars.
       - ALERT_TEXT=${ALERT_TEXT:-}
+      # Module 3 — A2A. When COMMS_A2A_URL is set Triage will dispatch
+      # any comms tasks in its plan to the Comms agent over HTTP. The
+      # OAuth token identifies us; the receiver's agent card decides.
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${TRIAGE_OAUTH_CLIENT_ID:-agent-triage}
+      - OAUTH_CLIENT_SECRET=${TRIAGE_OAUTH_CLIENT_SECRET:-agent-triage-secret-change-me}
+      - COMMS_A2A_URL=http://comms:9100
+    depends_on:
+      comms:
+        condition: service_healthy
     restart: "no"
 
   # Threat-Intel uses the MCP server's SOC tools through the
@@ -202,6 +212,11 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Comms is the first A2A receiver. It speaks HTTP, publishes its
+  # agent card at /.well-known/agent.json, and (when COMMS_ENFORCE_CARD=1)
+  # rejects calls whose OAuth client id is not in the per-skill
+  # allowed_callers list. Slice A toggles enforcement off to
+  # reproduce the failure mode; Slice B turns it on.
   comms:
     build:
       context: ./agents/comms
@@ -210,8 +225,22 @@ services:
       - path: .env
         required: false
     environment:
-      - AGENT_NAME=comms
       - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - COMMS_OAUTH_CLIENT_ID=${COMMS_OAUTH_CLIENT_ID:-agent-comms}
+      - COMMS_OAUTH_CLIENT_SECRET=${COMMS_OAUTH_CLIENT_SECRET:-agent-comms-secret-change-me}
+      - COMMS_ENFORCE_CARD=${COMMS_ENFORCE_CARD:-}
+      - COMMS_PORT=9100
+    ports:
+      - "9100:9100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9100/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      keycloak:
+        condition: service_healthy
     restart: unless-stopped
 
   approver:
