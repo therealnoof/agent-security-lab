@@ -51,6 +51,16 @@ A poisoned alert drives the unhardened Remediation agent to drop a `tickets` tab
 
 > **Setting up your environment** — see [`SETUP.md`](./SETUP.md) for the full topology, hardware/OS/network requirements, and step-by-step setup instructions for both **self-paced learners** and **lab owners/instructors** (per-learner tokens, room WiFi, pre-flight checklist).
 
+## Reset between runs
+
+To wipe lab state (containers, Postgres tables, Keycloak realm) and start over from Module 0 — preserves your `.env`:
+
+```bash
+bash scripts/clean.sh           # confirms before wiping
+bash scripts/clean.sh -y        # skip confirmation
+bash scripts/clean.sh --full -y # also remove built images (slow rebuild after)
+```
+
 ## Quick start
 
 > Most services are still being built (see [`PRD.md`](./PRD.md) §10). The **Triage agent vertical slice** is wired up — it proves end-to-end that LLM traffic flows through the F5 AI Security (CalypsoAI) proxy and that BYOA / Agentic Fingerprints sees a session-tagged trail.

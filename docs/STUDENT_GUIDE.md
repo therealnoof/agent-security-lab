@@ -21,6 +21,8 @@ This guide walks you through the lab end-to-end. You'll build, attack, and harde
 
 If you get stuck, the [Troubleshooting](../SETUP.md#a6-common-self-paced-gotchas) table in `SETUP.md` covers the issues we know about.
 
+**Starting fresh?** Run `bash scripts/clean.sh` to wipe lab state (containers, Postgres tables, Keycloak realm) and reset to Module 0. Your `.env` is preserved. Add `--full` to also remove built images and force a clean rebuild.
+
 ---
 
 ## Before you start
