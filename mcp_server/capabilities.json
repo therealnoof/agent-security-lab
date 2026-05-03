@@ -1,0 +1,15 @@
+{
+  "agent-threat-intel": [
+    "get_recent_alerts",
+    "get_alert_details",
+    "check_ip_reputation",
+    "lookup_ip_geolocation"
+  ],
+  "agent-remediation": [
+    "get_recent_alerts",
+    "get_alert_details",
+    "execute_db_query",
+    "quarantine_host",
+    "revoke_credential"
+  ]
+}

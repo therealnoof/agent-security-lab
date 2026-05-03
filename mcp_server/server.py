@@ -36,7 +36,8 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Mount, Route
 
-from auth import AuthMiddleware, check_scope, scope_for_sql
+from auth import AuthMiddleware, check_scope, current_client_id, scope_for_sql
+from capabilities import ALL_TOOLS, allowed_tools, is_allowed
 
 # -------------------------------------------------------
 # Postgres connection settings (read at tool-call time so
@@ -347,6 +348,71 @@ async def revoke_credential(principal: str, reason: str) -> str:
         "performed_at": datetime.now(timezone.utc).isoformat(),
         "note": "MOCK: no real IdP is wired up in this lab",
     }, indent=2)
+
+
+# =====================================================================
+# PER-AGENT CAPABILITY MANIFEST (Module 2)
+# =====================================================================
+# Wraps FastMCP's tool manager so:
+#   - list_tools() returns ONLY the tools the connecting agent's
+#     OAuth client id is allowed to use (capabilities.json).
+#     The LLM's function-calling menu therefore never includes
+#     tools the agent has no business calling.
+#   - call_tool() also checks the manifest (defense in depth).
+#     If a model somehow asks for a tool that isn't in its
+#     menu (e.g., it remembered the name from prior context),
+#     the call fails closed with a structured error result.
+#
+# This is the second authorization layer in the lab — orthogonal
+# to the OAuth scope check inside each tool body. Capability is
+# identity-based ("can this agent use this tool at all?"). Scope
+# is action-based ("can this specific call be performed?").
+# =====================================================================
+
+_tool_manager = mcp._tool_manager  # FastMCP internal — see comment above
+_orig_list_tools = _tool_manager.list_tools
+_orig_call_tool  = _tool_manager.call_tool
+
+
+def _filtered_list_tools():
+    all_tools = _orig_list_tools()
+    granted = allowed_tools(current_client_id())
+    if granted == ALL_TOOLS:
+        return all_tools
+    filtered = [t for t in all_tools if t.name in granted]
+    print(
+        f"[mcp-server] list_tools for client={current_client_id()!r}: "
+        f"{len(filtered)}/{len(all_tools)} tools "
+        f"({sorted(t.name for t in filtered)})",
+        flush=True,
+    )
+    return filtered
+
+
+async def _checked_call_tool(name: str, arguments: dict, *args, **kwargs):
+    if not is_allowed(current_client_id(), name):
+        print(
+            f"[mcp-server] call_tool DENIED for client={current_client_id()!r} "
+            f"tool={name!r} (not in capability manifest)",
+            flush=True,
+        )
+        # Mimic the FastMCP "tool returned a string" path: return a
+        # text content block whose body is the structured error JSON.
+        # The agent then sees this as a normal tool result and can
+        # adapt — same model behavior as the OAuth deny in Slice B.
+        from mcp.types import TextContent
+        body = json.dumps({
+            "error": "forbidden",
+            "reason": "tool not in capability manifest for this client",
+            "client_id": current_client_id(),
+            "tool": name,
+        }, indent=2)
+        return [TextContent(type="text", text=body)]
+    return await _orig_call_tool(name, arguments, *args, **kwargs)
+
+
+_tool_manager.list_tools = _filtered_list_tools
+_tool_manager.call_tool  = _checked_call_tool
 
 
 # =====================================================================

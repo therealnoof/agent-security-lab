@@ -63,6 +63,21 @@
       "implicitFlowEnabled": false,
       "defaultClientScopes": ["mcp:read", "mcp:write"],
       "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-threat-intel",
+      "name": "Threat-Intel agent",
+      "description": "Service-account client used by the Threat-Intel agent. Read-only at the OAuth layer (mcp:read). Module 2 adds a per-agent capability manifest on top: even within mcp:read, Threat-Intel can only see the SOC investigation tools — the destructive ones are not in its tool menu at all.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-threat-intel-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": ["mcp:read"],
+      "optionalClientScopes": []
     }
   ]
 }

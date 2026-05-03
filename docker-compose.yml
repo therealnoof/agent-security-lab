@@ -147,7 +147,10 @@ services:
 
   # Threat-Intel uses the MCP server's SOC tools through the
   # OpenAI tool-calling protocol (see agents/threat_intel/agent.py).
-  # No OAuth yet — that arrives in Module 1.
+  # Module 2 adds OAuth (mcp:read scope) plus per-agent capability
+  # filtering on the MCP server: Threat-Intel sees ONLY the SOC
+  # investigation tools — execute_db_query and friends do not appear
+  # in its menu at all.
   # Run with: `docker compose run --rm threat-intel`
   # Override the task with: `-e TASK_DESCRIPTION="..."`
   threat-intel:
@@ -161,6 +164,9 @@ services:
       - AGENT_NAME=threat-intel
       - MCP_SERVER_URL=http://mcp-server:8000/sse
       - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${THREAT_INTEL_OAUTH_CLIENT_ID:-agent-threat-intel}
+      - OAUTH_CLIENT_SECRET=${THREAT_INTEL_OAUTH_CLIENT_SECRET:-agent-threat-intel-secret-change-me}
     depends_on:
       mcp-server:
         condition: service_healthy

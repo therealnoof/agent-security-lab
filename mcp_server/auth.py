@@ -60,14 +60,27 @@ SKIP_AUTH = os.environ.get("MCP_SKIP_AUTH", "").lower() in ("1", "true", "yes")
 
 
 # -------------------------------------------------------
-# ContextVar — set by the middleware, read by tools.
-# Stores the scopes granted by the bearer token on this
-# request, parsed from the OAuth `scope` claim (a single
-# space-separated string per RFC 6749).
+# ContextVars — set by the middleware, read by tools.
+#
+#   _request_scopes  — the OAuth scopes granted by the bearer
+#                      token on this request, parsed from the
+#                      `scope` claim (RFC 6749 space-separated).
+#   _request_client_id — the OAuth client id (clientId / azp)
+#                      that the introspected token belongs to.
+#                      Used by capabilities.py to apply the
+#                      per-agent capability manifest (Module 2).
 # -------------------------------------------------------
 _request_scopes: contextvars.ContextVar[frozenset[str]] = contextvars.ContextVar(
     "request_scopes", default=frozenset()
 )
+_request_client_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "request_client_id", default=None
+)
+
+
+def current_client_id() -> str | None:
+    """The OAuth client id of the agent attached to this request, or None."""
+    return _request_client_id.get()
 
 
 class ScopeError(Exception):
@@ -181,10 +194,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if SKIP_AUTH:
-            # Lab-only: allow running the MCP server with no Keycloak
-            # in front of it (used by the Module 0.5 self-test before
-            # OAuth is wired up).
-            return await call_next(request)
+            # Lab-only: bypass Keycloak entirely (Slice A demos). Bind
+            # contextvars to "permissive" sentinels so scope checks and
+            # capability checks both pass — otherwise removing auth
+            # would break BOTH demos (since they were added later).
+            from capabilities import ALL_TOOLS
+            cv_scope  = _request_scopes.set(frozenset({"mcp:read", "mcp:write", "mcp:admin"}))
+            cv_client = _request_client_id.set(ALL_TOOLS)
+            try:
+                return await call_next(request)
+            finally:
+                _request_scopes.reset(cv_scope)
+                _request_client_id.reset(cv_client)
 
         auth = request.headers.get("authorization") or request.headers.get("Authorization")
         if not auth or not auth.lower().startswith("bearer "):
@@ -202,16 +223,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
             )
 
         scopes = _scopes_from_introspection(introspection)
-        token_for_log = introspection.get("clientId") or introspection.get("username") or "<unknown>"
+        # The introspection response's `clientId` is the OAuth client
+        # that the token was issued to — the agent's identity. Used
+        # by the per-agent capability manifest (Module 2).
+        client_id = introspection.get("clientId") or introspection.get("azp")
+        token_for_log = client_id or introspection.get("username") or "<unknown>"
         print(
             f"[mcp-server.auth] accepted token from {token_for_log} "
             f"with scopes={sorted(scopes)}",
             flush=True,
         )
 
-        # Bind scopes for this request's task chain.
-        cv_token = _request_scopes.set(scopes)
+        # Bind scopes + client id for this request's task chain.
+        cv_scope = _request_scopes.set(scopes)
+        cv_client = _request_client_id.set(client_id)
         try:
             return await call_next(request)
         finally:
-            _request_scopes.reset(cv_token)
+            _request_scopes.reset(cv_scope)
+            _request_client_id.reset(cv_client)

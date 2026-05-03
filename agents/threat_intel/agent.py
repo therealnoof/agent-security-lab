@@ -43,6 +43,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from openai import OpenAI
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -66,6 +67,15 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8000/sse")
 # could otherwise loop forever; in production this is the
 # single cheapest guardrail you can add.
 MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "8"))
+
+# OAuth (Module 2). Identical pattern to the Remediation agent —
+# fetch a client_credentials token and present it on the MCP SSE
+# connection. Threat-Intel's Keycloak client is granted only
+# `mcp:read`, and Module 2's capability manifest filters its
+# tool menu to the SOC investigation tools.
+KEYCLOAK_ISSUER     = os.environ.get("KEYCLOAK_ISSUER")
+OAUTH_CLIENT_ID     = os.environ.get("OAUTH_CLIENT_ID", "agent-threat-intel")
+OAUTH_CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET", "agent-threat-intel-secret-change-me")
 
 if not CALYPSOAI_TOKEN or not CALYPSOAI_OPENAI_API_BASE:
     sys.exit(
@@ -161,6 +171,41 @@ def mcp_tool_to_openai_function(mcp_tool) -> dict:
     }
 
 
+async def fetch_oauth_token() -> str | None:
+    """
+    client_credentials grant against Keycloak. Returns None when no
+    issuer is configured (lets the agent be run without OAuth for
+    early debugging). Identical to the Remediation agent's helper.
+    """
+    if not KEYCLOAK_ISSUER:
+        return None
+
+    token_url = f"{KEYCLOAK_ISSUER.rstrip('/')}/protocol/openid-connect/token"
+    print(f"[{AGENT_NAME}] fetching OAuth token from {token_url}", flush=True)
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            token_url,
+            data={"grant_type": "client_credentials"},
+            auth=(OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET),
+        )
+    if resp.status_code != 200:
+        print(
+            f"[{AGENT_NAME}] !!! token fetch failed: "
+            f"HTTP {resp.status_code} {resp.text[:200]}",
+            flush=True,
+        )
+        sys.exit(2)
+
+    body = resp.json()
+    print(
+        f"[{AGENT_NAME}] got token, scopes: {body.get('scope', '<none>')}, "
+        f"expires_in={body.get('expires_in')}s",
+        flush=True,
+    )
+    return body["access_token"]
+
+
 def assistant_message(msg) -> dict:
     """
     Build the dict shape the OpenAI API expects when echoing an
@@ -192,12 +237,20 @@ async def run() -> None:
     print(f"[{AGENT_NAME}] model        = {CALYPSOAI_MODEL}", flush=True)
     print(f"[{AGENT_NAME}] mcp          = {MCP_SERVER_URL}", flush=True)
     print(f"[{AGENT_NAME}] task         = {task}", flush=True)
+
+    token = await fetch_oauth_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    print(
+        f"[{AGENT_NAME}] mcp auth     = {'OAuth bearer' if token else 'anonymous'}",
+        flush=True,
+    )
+
     print(f"[{AGENT_NAME}] ─── connecting to MCP and listing tools ───", flush=True)
 
     # Connect to the MCP server, discover tools, run the agent loop.
     # `sse_client` opens an SSE stream; `ClientSession` wraps it in
     # the MCP protocol handshake.
-    async with sse_client(MCP_SERVER_URL) as (read_stream, write_stream):
+    async with sse_client(MCP_SERVER_URL, headers=headers) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
 
