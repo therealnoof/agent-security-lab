@@ -697,6 +697,48 @@ bash scripts/show-tickets.sh
 
 The 10 tickets are still there. The agent reasoned its way toward the same destructive plan as Slice A — and the OAuth-scoped token plus the MCP server's per-tool scope check made the destructive call into a no-op.
 
+#### Where the deny actually lived (and what BYOA can and can't see)
+
+When you look up the run in F5 AI Security, you may notice that **you don't see the OAuth deny itself** — only the model's final "failed" report. That's not a bug; it reflects how the call paths are wired:
+
+```
+┌─────────┐  (1) prompt + tools  ┌──────────┐  (2) "DROP TABLE" ┌─────────┐
+│  Agent  │────────────────────▶│ Calypso  │ ─ ─ ─ ─ ─ ─ ─ ─ ▶│   LLM   │
+│         │ ◀────────────────────│  proxy   │ ◀─ ─ ─ ─ ─ ─ ─ ─ │         │
+└────┬────┘    tool_call back    └──────────┘                  └─────────┘
+     │
+     │ (3) execute the tool the model picked
+     ▼
+┌─────────┐                                                    ┌──────────┐
+│   MCP   │ (4) introspect bearer token ──────────────────────▶│ Keycloak │
+│ server  │ ◀────────────────  scopes / 401  ──────────────────│          │
+└────┬────┘                                                    └──────────┘
+     │ (5) returns 403-shaped tool result {error: forbidden, ...}
+     ▼
+┌─────────┐
+│  Agent  │  (6) feeds the forbidden result back to Calypso/LLM as the next turn
+└─────────┘
+```
+
+Calypso sees legs **(1)**, **(2)**, and **(6)** — the LLM-facing traffic. It never sees **(3)/(4)/(5)** — those run agent ↔ MCP ↔ Keycloak on a different network path with different auth.
+
+The deny does show up in Calypso *indirectly*: in round 2 the agent sends the LLM a `role: tool` message whose content is the forbidden JSON. Scroll through the session's prompts in the Calypso **logs** view and you'll find a message containing:
+
+```json
+{"error":"forbidden","required_scope":"mcp:admin","granted_scopes":["mcp:read","mcp:write"],...}
+```
+
+That is *why* the model wrote `outcome: "failed"` — Calypso saw the **consequence**, not the **cause**.
+
+**The takeaway: complete agent observability needs both layers.**
+
+| Layer | What it shows | Tool in this lab |
+|---|---|---|
+| LLM-facing | What the model thought, which tools it asked for, what it did with results | F5 AI Security (Calypso) — BYOA / Agentic Fingerprints / logs |
+| Tool-facing | Which tool calls actually fired, which got denied, which token presented which scopes | MCP server logs (`docker compose logs mcp-server`) + Keycloak's audit/event logs |
+
+Either alone leaves a blind spot. The PocketOS / Cursor incident had the second layer (Railway recorded the destructive API call) but no view into the first (no visibility into the Cursor agent's reasoning before it acted). The lesson is to wire both before you ship an autonomous agent.
+
 #### Step 7 — Try variations to test the boundary
 
 A read-only task (should fully succeed):
