@@ -29,8 +29,14 @@ import json
 import os
 import httpx
 import asyncpg
+import uvicorn
 from datetime import datetime, timezone
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
+from starlette.responses import PlainTextResponse
+from starlette.routing import Mount, Route
+
+from auth import AuthMiddleware, check_scope, scope_for_sql
 
 # -------------------------------------------------------
 # Postgres connection settings (read at tool-call time so
@@ -111,6 +117,8 @@ async def get_recent_alerts(limit: int = 5) -> str:
     Args:
         limit: How many recent alerts to return (default: 5, max: 10)
     """
+    if err := check_scope("mcp:read"):
+        return err
     limit = min(limit, 10)
     return json.dumps({
         "alert_count": min(limit, len(SIMULATED_ALERTS)),
@@ -127,6 +135,8 @@ async def lookup_ip_geolocation(ip_address: str) -> str:
     Args:
         ip_address: The IPv4 address to look up (e.g., '185.220.101.45')
     """
+    if err := check_scope("mcp:read"):
+        return err
     # ip-api.com is a free service (no key, ~45 req/min on free tier).
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -168,6 +178,8 @@ async def check_ip_reputation(ip_address: str) -> str:
     Args:
         ip_address: The IPv4 address to check.
     """
+    if err := check_scope("mcp:read"):
+        return err
     if ip_address in KNOWN_MALICIOUS_IPS:
         info = KNOWN_MALICIOUS_IPS[ip_address]
         return json.dumps({
@@ -198,6 +210,8 @@ async def get_alert_details(alert_id: str) -> str:
     Args:
         alert_id: The alert identifier, e.g., 'ALT-001'.
     """
+    if err := check_scope("mcp:read"):
+        return err
     for alert in SIMULATED_ALERTS:
         if alert["id"] == alert_id:
             return json.dumps(alert, indent=2)
@@ -233,10 +247,24 @@ async def execute_db_query(sql: str) -> str:
     Args:
         sql: The SQL statement to execute. Single statement only.
     """
+    # SCOPE-AWARE: the required scope depends on the SQL verb.
+    # SELECT     → mcp:read
+    # INSERT/UPD → mcp:write
+    # DROP/CRT/  → mcp:admin   (the destructive set)
+    #   ALTER/etc.
+    # This is the central conceit of Slice B: the SAME tool is
+    # authorized differently per call. The Remediation agent's
+    # token has read+write but NOT admin, so DROP TABLE fails
+    # here while UPDATE rows still works.
+    needed = scope_for_sql(sql)
+    if err := check_scope(needed):
+        print(f"[mcp-server] execute_db_query DENIED: needed={needed}, sql={sql!r}", flush=True)
+        return err
+
     # Log the query so a human watching the MCP server logs can see
     # exactly what the agent decided to run. This is the visibility
     # an instructor will point at during the destructive demo.
-    print(f"[mcp-server] execute_db_query: {sql!r}", flush=True)
+    print(f"[mcp-server] execute_db_query (scope={needed}): {sql!r}", flush=True)
 
     try:
         conn = await asyncpg.connect(
@@ -284,6 +312,8 @@ async def quarantine_host(hostname: str, reason: str) -> str:
         hostname: The hostname or IP to quarantine.
         reason:   A short human-readable reason (will be logged).
     """
+    if err := check_scope("mcp:write"):
+        return err
     # Mocked: in a real lab we would call the network controller. For
     # teaching purposes we just record the action so it appears in the
     # MCP server logs and the Remediation agent's report.
@@ -307,6 +337,8 @@ async def revoke_credential(principal: str, reason: str) -> str:
         principal: The user/service identifier to revoke.
         reason:    A short human-readable reason (will be logged).
     """
+    if err := check_scope("mcp:write"):
+        return err
     print(f"[mcp-server] revoke_credential: {principal} (reason: {reason})", flush=True)
     return json.dumps({
         "principal": principal,
@@ -317,10 +349,34 @@ async def revoke_credential(principal: str, reason: str) -> str:
     }, indent=2)
 
 
-# -------------------------------------------------------
-# Start the server when run directly.
-# SSE transport listens on http://0.0.0.0:8000/sse
-# -------------------------------------------------------
+# =====================================================================
+# APP BOOTSTRAP
+# =====================================================================
+# Why we don't just call `mcp.run(transport="sse")` anymore:
+#   - We need to put a Starlette middleware (AuthMiddleware) in front
+#     of the SSE endpoints to extract+introspect the bearer token.
+#   - We need a /health route the Docker healthcheck can hit
+#     unauthenticated.
+# So we grab FastMCP's underlying SSE app, wrap it in our own Starlette
+# app with the extra route + middleware, and serve it with uvicorn.
+# =====================================================================
+
+async def _health(_request) -> PlainTextResponse:
+    return PlainTextResponse("ok")
+
+
+def build_app() -> Starlette:
+    inner = mcp.sse_app()
+    app = Starlette(
+        routes=[
+            Route("/health", _health),
+            Mount("/", app=inner),
+        ],
+    )
+    app.add_middleware(AuthMiddleware)
+    return app
+
+
 if __name__ == "__main__":
     print("Starting SOC Tools MCP Server on port 8000…", flush=True)
     print(
@@ -328,4 +384,4 @@ if __name__ == "__main__":
         "get_alert_details, execute_db_query, quarantine_host, revoke_credential",
         flush=True,
     )
-    mcp.run(transport="sse")
+    uvicorn.run(build_app(), host="0.0.0.0", port=8000, log_level="info")

@@ -1,0 +1,70 @@
+{
+  "_comment_top": "agent-security-lab — Keycloak realm export. Imported on first Keycloak start via --import-realm. Defines three OAuth scopes (mcp:read / mcp:write / mcp:admin) plus an agent-remediation client whose token has read+write but NOT admin — that's the guardrail Module 1 Slice B layers on. The mcp-server client is the resource server and uses its client secret to call Keycloak's token-introspection endpoint.",
+
+  "realm": "agent-lab",
+  "enabled": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "clientScopes": [
+    {
+      "name": "mcp:read",
+      "description": "Read-only SOC tools and SELECT against the operational DB.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "mcp:write",
+      "description": "Mutating but non-destructive: UPDATE/INSERT/DELETE rows, mocked host/credential controls.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "mcp:admin",
+      "description": "Destructive DDL: DROP / CREATE / ALTER / TRUNCATE. Reserve for break-glass scenarios.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "mcp-server",
+      "name": "MCP Server (resource server)",
+      "description": "The MCP server uses this client's secret to call Keycloak's token-introspection endpoint when validating bearer tokens from agents.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "mcp-server-secret-change-me",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false
+    },
+    {
+      "clientId": "agent-remediation",
+      "name": "Remediation agent",
+      "description": "Service-account client used by the Remediation agent. Granted mcp:read + mcp:write at the realm; deliberately NOT granted mcp:admin so the destructive demo fails when the agent tries DROP TABLE.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-remediation-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": ["mcp:read", "mcp:write"],
+      "optionalClientScopes": []
+    }
+  ]
+}

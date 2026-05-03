@@ -44,6 +44,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from openai import OpenAI
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -61,6 +62,14 @@ CALYPSOAI_MODEL = os.environ.get("CALYPSOAI_MODEL", "gpt-4o-mini")
 
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8000/sse")
 MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "8"))
+
+# OAuth (Module 1 Slice B). When KEYCLOAK_ISSUER is set we fetch a
+# client_credentials token before connecting to MCP and present it as
+# Authorization: Bearer <token>. When unset, we connect anonymously
+# (Slice A behavior — used for the "observe the failure" demo).
+KEYCLOAK_ISSUER         = os.environ.get("KEYCLOAK_ISSUER")
+OAUTH_CLIENT_ID         = os.environ.get("OAUTH_CLIENT_ID", "agent-remediation")
+OAUTH_CLIENT_SECRET     = os.environ.get("OAUTH_CLIENT_SECRET", "agent-remediation-secret-change-me")
 
 if not CALYPSOAI_TOKEN or not CALYPSOAI_OPENAI_API_BASE:
     sys.exit(
@@ -138,6 +147,48 @@ def mcp_tool_to_openai_function(mcp_tool) -> dict:
     }
 
 
+async def fetch_oauth_token() -> str | None:
+    """
+    Get a short-lived bearer token from Keycloak using the
+    client_credentials grant. Returns None when no Keycloak issuer is
+    configured (Slice A) so the MCP connection is made anonymously.
+
+    What the lab cares about: this is the OAuth 2.1 way of giving an
+    autonomous agent narrowly-scoped, time-limited credentials instead
+    of a long-lived static API key. The token's `scope` claim is what
+    the MCP server enforces against per Slice B.
+    """
+    if not KEYCLOAK_ISSUER:
+        return None
+
+    token_url = f"{KEYCLOAK_ISSUER.rstrip('/')}/protocol/openid-connect/token"
+    print(f"[{AGENT_NAME}] fetching OAuth token from {token_url}", flush=True)
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            token_url,
+            data={"grant_type": "client_credentials"},
+            auth=(OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET),
+        )
+    if resp.status_code != 200:
+        print(
+            f"[{AGENT_NAME}] !!! token fetch failed: "
+            f"HTTP {resp.status_code} {resp.text[:200]}",
+            flush=True,
+        )
+        sys.exit(2)
+
+    body = resp.json()
+    token = body["access_token"]
+    granted_scopes = body.get("scope", "<none>")
+    print(
+        f"[{AGENT_NAME}] got token, scopes: {granted_scopes}, "
+        f"expires_in={body.get('expires_in')}s",
+        flush=True,
+    )
+    return token
+
+
 def assistant_message(msg) -> dict:
     out: dict = {"role": "assistant", "content": msg.content}
     if msg.tool_calls:
@@ -160,9 +211,15 @@ async def run() -> None:
     print(f"[{AGENT_NAME}] model        = {CALYPSOAI_MODEL}", flush=True)
     print(f"[{AGENT_NAME}] mcp          = {MCP_SERVER_URL}", flush=True)
     print(f"[{AGENT_NAME}] task         = {task}", flush=True)
+
+    token = await fetch_oauth_token()
+    headers = {"Authorization": f"Bearer {token}"} if token else None
+    auth_label = "OAuth bearer" if token else "anonymous (Slice A)"
+    print(f"[{AGENT_NAME}] mcp auth     = {auth_label}", flush=True)
+
     print(f"[{AGENT_NAME}] ─── connecting to MCP and listing tools ───", flush=True)
 
-    async with sse_client(MCP_SERVER_URL) as (read_stream, write_stream):
+    async with sse_client(MCP_SERVER_URL, headers=headers) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as mcp_session:
             await mcp_session.initialize()
 

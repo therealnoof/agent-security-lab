@@ -25,13 +25,17 @@
 services:
 
   # ─── IdP ───────────────────────────────────────────────────
+  # Keycloak imports keycloak/realm/agent-lab-realm.json on first
+  # start (only on a fresh keycloak-data volume). To re-import
+  # after editing the realm, `docker compose down -v keycloak`
+  # then `docker compose up -d keycloak`.
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     container_name: asl-keycloak
     command: ["start-dev", "--import-realm"]
     environment:
-      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-change-me-locally}
     ports:
       - "8080:8080"
     volumes:
@@ -81,16 +85,26 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-tickets}
       - POSTGRES_USER=${POSTGRES_USER:-lab}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-locally}
+      # OAuth (Slice B). When KEYCLOAK_ISSUER is set the AuthMiddleware
+      # demands a valid bearer token and uses MCP_OAUTH_CLIENT_*
+      # to call the introspection endpoint. Set MCP_SKIP_AUTH=1 to
+      # disable auth for Slice A demos.
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - MCP_OAUTH_CLIENT_ID=${MCP_OAUTH_CLIENT_ID:-mcp-server}
+      - MCP_OAUTH_CLIENT_SECRET=${MCP_OAUTH_CLIENT_SECRET:-mcp-server-secret-change-me}
+      - MCP_SKIP_AUTH=${MCP_SKIP_AUTH:-}
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/sse', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     restart: unless-stopped
 
@@ -170,6 +184,13 @@ services:
       - AGENT_NAME=remediation
       - MCP_SERVER_URL=http://mcp-server:8000/sse
       - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
+      # OAuth (Slice B). Setting KEYCLOAK_ISSUER tells the agent to
+      # fetch a client_credentials token before connecting to MCP.
+      # Unset to skip OAuth (only useful with MCP_SKIP_AUTH=1 on the
+      # mcp-server).
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${REMEDIATION_OAUTH_CLIENT_ID:-agent-remediation}
+      - OAUTH_CLIENT_SECRET=${REMEDIATION_OAUTH_CLIENT_SECRET:-agent-remediation-secret-change-me}
     depends_on:
       mcp-server:
         condition: service_healthy
