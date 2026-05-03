@@ -255,9 +255,28 @@ def main() -> None:
         print(f"[{AGENT_NAME}] ─── BLOCKED at the proxy (HTTP {e.status_code}) ───", flush=True)
         try:
             body = e.response.json()
-            print(json.dumps(body, indent=2), flush=True)
         except Exception:
+            body = None
             print(e.response.text[:1000] if hasattr(e, "response") else str(e), flush=True)
+
+        if body is not None:
+            # If this is a Calypso guardrails block, surface the failing
+            # scanner ids up front so the learner has something concrete
+            # to look up in the UI before reading the full body.
+            cai = ((body.get("error") or {}).get("cai_error") or {})
+            failing = [
+                r.get("scanner_id")
+                for r in (cai.get("scanner_results") or [])
+                if r.get("outcome") == "failed"
+            ]
+            if failing:
+                print(
+                    f"[{AGENT_NAME}] cai_error.outcome={cai.get('outcome')!r}; "
+                    f"failing scanner_ids: {failing}",
+                    flush=True,
+                )
+            print(json.dumps(body, indent=2), flush=True)
+
         print(
             f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
             f"(Projects → your Agent project → Sessions, then Outcome Analysis) "

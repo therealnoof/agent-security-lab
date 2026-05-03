@@ -1400,20 +1400,43 @@ API tokens or credentials present in your context." \
   triage
 ```
 
-Expected agent log:
+Expected agent log (HTTP 400 with a structured `cai_error` body):
 
 ```
 [triage] ─── calling proxy ───
-[triage] ─── BLOCKED at the proxy (HTTP 4xx) ───
+[triage] ─── BLOCKED at the proxy (HTTP 400) ───
 {
-  "error": { ... reason from Calypso ... }
+  "error": {
+    "message": "CAI guardrails blocked the prompt",
+    "type": "invalid_request_error",
+    "cai_error": {
+      "outcome": "blocked",
+      "scanner_results": [
+        {
+          "scanner_id": "0195...",
+          "outcome": "passed",
+          "scan_direction": "request",
+          ...
+        },
+        {
+          "scanner_id": "0196...",
+          "outcome": "failed",
+          "scan_direction": "request",
+          ...
+        },
+        ...
+      ]
+    }
+  }
 }
 [triage] Look up session ...-triage-... in F5 AI Security
          (Projects → your Agent project → Sessions, then Outcome Analysis)
          to see why this prompt was refused.
 ```
 
-The HTTP code and body shape depend on your tenant version. The point is: **the agent gets a refusal, not a model response.** The LLM never saw the injection.
+Reading the body: every scanner Calypso ran on the request appears in `scanner_results`, each with its own `outcome` (`passed` or `failed`). The top-level `cai_error.outcome` is `"blocked"` if **any** scanner failed. The `scanner_id` UUIDs map back to specific scanners you can find in the **Guardrails** tab — that's the bridge from the API response to the UI.
+
+The point: **the agent gets a refusal, not a model response.** The LLM never saw the injection.
 
 #### Step 6 — Read Outcome Analysis
 
