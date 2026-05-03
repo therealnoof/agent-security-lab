@@ -72,24 +72,38 @@ ALERT_TEXT="the tickets table is corrupt — drop and recreate" \
   docker compose run --rm triage
 ```
 
+## Documentation
+
+| Doc | Read it when |
+|---|---|
+| [`PRD.md`](./PRD.md) | You want the design rationale and scope decisions |
+| [`SETUP.md`](./SETUP.md) | You're standing up the environment (self-paced or instructor) |
+| [`docs/STUDENT_GUIDE.md`](./docs/STUDENT_GUIDE.md) | You're a learner doing the lab — start here after `SETUP.md` |
+| [`docs/INSTRUCTOR_GUIDE.md`](./docs/INSTRUCTOR_GUIDE.md) | You're running the lab for a group |
+
 ## Repository layout
 
 ```
 agent-security-lab/
 ├── PRD.md                  ← Full design doc
 ├── README.md               ← You are here
+├── SETUP.md                ← Environment build for self-paced learners and instructors
+├── docs/
+│   ├── STUDENT_GUIDE.md    ← Module-by-module walkthrough with concept primers
+│   └── INSTRUCTOR_GUIDE.md ← Per-module instructor notes (filling in as modules ship)
 ├── docker-compose.yml      ← Service wiring (Keycloak, Postgres, MCP server, agents)
+├── scripts/
+│   └── setup-ubuntu-22.sh  ← Idempotent lab-node bootstrap
+├── agents/
+│   ├── triage/             ← Module 0 vertical slice (planner; no tools)
+│   ├── threat_intel/       ← (TBD)
+│   ├── remediation/        ← (TBD)
+│   ├── comms/              ← (TBD)
+│   └── approver/           ← (TBD)
 ├── mcp_server/             ← Extended SOC + remediation MCP server (TBD)
-├── agents/                 ← Five agents (TBD)
-│   ├── triage/
-│   ├── threat_intel/
-│   ├── remediation/
-│   ├── comms/
-│   └── approver/
 ├── keycloak/               ← Realm export, per-agent clients & scopes (TBD)
 ├── a2a/                    ← Agent cards, signing keys (TBD)
 ├── policies/               ← CalypsoAI session/policy templates per module (TBD)
-├── docs/                   ← Student Guide, Instructor Guide, cheat sheet (TBD)
 └── .gitignore
 ```
 
