@@ -163,8 +163,17 @@ Open `.env` and fill in **at minimum**:
 | Variable | Where to get it |
 |---|---|
 | `CALYPSOAI_TOKEN` | F5 AI Security UI → API tokens, or your instructor |
-| `CALYPSOAI_OPENAI_API_BASE` | F5 AI Security UI → "OpenAI-compatible endpoint" for your tenant |
-| `CALYPSOAI_MODEL` | Whichever model your tenant exposes (e.g., `gpt-4o-mini`) |
+| `CALYPSOAI_OPENAI_API_BASE` | `https://www.<region>.calypsoai.app/openai/<PROVIDER-NAME>` — see note below |
+| `CALYPSOAI_MODEL` | The model id the provider exposes (e.g., `gemini-2.5-flash`, `gpt-4o-mini`) |
+
+> **Heads up on the proxy URL.** The path segment after `/openai/` is the **provider name** — the upstream-LLM connection your tenant admin configured — *not* the project name and *not* the project's `friendlyId`. If you guess wrong you'll get `HTTP 404 {"detail":"Not Found"}`. To list the providers your token can see:
+>
+> ```bash
+> curl -sS -H "Authorization: Bearer $CALYPSOAI_TOKEN" \
+>   "https://www.us1.calypsoai.app/backend/v1/providers" | python3 -m json.tool
+> ```
+>
+> Use the `name` field (e.g., `gemini-2-5-flash`) and the corresponding `inputs.model` field for `CALYPSOAI_MODEL` (e.g., `gemini-2.5-flash`).
 
 Leave the Keycloak and Postgres values at their defaults for now.
 
@@ -216,6 +225,7 @@ docker compose down -v        # -v also wipes Postgres state, fresh start
 | Symptom | Cause | Fix |
 |---|---|---|
 | `triage` exits with `Missing CALYPSOAI_TOKEN` | `.env` not filled in or not picked up | Confirm `.env` exists in repo root and the variables are uncommented |
+| `HTTP 404 {"detail":"Not Found"}` from the proxy | Wrong path segment after `/openai/` — you used a project name instead of a provider name | List providers with the curl in §A3 above and use the `name` field |
 | Network timeout to the proxy | VPN, corporate proxy, or firewall | Test `curl -I $CALYPSOAI_OPENAI_API_BASE` from your host; if it fails, work with your IT or get off the VPN for the lab |
 | Port 8080 already in use | Another local service squats Keycloak's port | `docker compose ps` then either stop the conflicting service or edit `docker-compose.yml` to remap |
 | Docker says "no space left" | Old images / volumes from other projects | `docker system prune -a` |
