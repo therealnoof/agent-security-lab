@@ -263,6 +263,139 @@ When all four are checked, move on.
 
 ---
 
+# Module 0.5 — A second agent and the MCP wire
+
+## Goal
+
+Module 0 proved one agent can route through F5 BYOA. Now you'll:
+
+1. Stand up the **MCP server** that holds the SOC investigation tools.
+2. Run a **second agent** (Threat-Intel) that uses those tools by emitting OpenAI-style function calls.
+3. See **two distinct sessions** for one lab run in the F5 UI — one per agent.
+4. Watch the model's **tool-call decisions** appear in the chain of thought.
+
+This is the foundation Module 1 builds on. Without it, the "agent decides to run a destructive tool" demo doesn't have anything to *decide*.
+
+## What you'll learn
+
+- The **agentic tool-calling loop** — how an LLM goes from "talking" to "doing."
+- How **MCP** lets you advertise tools to any client without coupling them.
+- Why each agent gets its own session ID, and how that shows up in BYOA.
+- The difference between *the model deciding to call a tool* and *the runtime actually executing it* — that gap is where every guardrail lives.
+
+## New concepts
+
+| Term | Definition |
+|---|---|
+| **Tool-calling loop** | LLM proposes a function call → runtime executes it → result fed back → LLM decides what's next. Repeats until the LLM stops calling tools. |
+| **Tool / function schema** | A JSON-Schema-like description of a function (name, description, args). The LLM reads it and decides whether to call. |
+| **MCP `list_tools` / `call_tool`** | The two MCP RPCs we use: discover what's available, then invoke. |
+| **MAX_ITERATIONS** | The cheapest production guardrail there is — cap the loop. A confused agent will spin forever otherwise. |
+
+## Walkthrough
+
+### Step 1 — Read the new pieces
+
+Open in your editor:
+
+- `mcp_server/server.py` — four `@mcp.tool()`-decorated functions: `get_recent_alerts`, `get_alert_details`, `check_ip_reputation`, `lookup_ip_geolocation`. The docstrings are part of the contract — the LLM reads them to choose which tool to call.
+- `agents/threat_intel/agent.py` — the new pieces vs. Triage are:
+  - `mcp_tool_to_openai_function()` — translates an MCP tool descriptor into the OpenAI function-calling schema.
+  - The `for iteration in range(...)` loop — the tool-calling cycle. Find the line `if not msg.tool_calls:` — that's the exit condition.
+  - The `await mcp_session.call_tool(tool_name, tool_args)` line — that is where the model's *decision* becomes the runtime's *action*. **Every guardrail in the rest of the lab fits into the gap on either side of that line.**
+
+### Step 2 — Bring up the MCP server
+
+```bash
+docker compose up -d mcp-server
+docker compose ps mcp-server          # should show "healthy" within ~30 seconds
+```
+
+If it stays "starting" or goes "unhealthy", check `docker compose logs mcp-server`.
+
+### Step 3 — Run Threat-Intel against the default IP
+
+```bash
+docker compose run --rm threat-intel
+```
+
+Expected output (abbreviated):
+
+```
+[threat-intel] session_id   = <run>-threat-intel-<ts>-<rand>
+[threat-intel] mcp          = http://mcp-server:8000/sse
+[threat-intel] task         = Investigate source IP 185.220.101.45...
+[threat-intel] tools advertised by MCP: check_ip_reputation, get_alert_details, get_recent_alerts, lookup_ip_geolocation
+[threat-intel] ─── round 1: calling proxy ───
+[threat-intel]   tool call: check_ip_reputation({"ip_address": "185.220.101.45"})
+[threat-intel]   tool call: lookup_ip_geolocation({"ip_address": "185.220.101.45"})
+[threat-intel] ─── round 2: calling proxy ───
+[threat-intel] ─── final assessment ───
+{
+  "investigated_indicator": "185.220.101.45",
+  "tools_used": ["check_ip_reputation", "lookup_ip_geolocation"],
+  "findings": [
+    "IP is a known Tor Exit Node (confidence 90)",
+    "Hosted by ..."
+  ],
+  "risk_score": "high",
+  "recommended_action": "block",
+  "rationale": "..."
+}
+```
+
+Things to notice:
+
+- The number of **rounds** depends on the model. A good model batches its tool calls in a single round; a worse one might use more rounds.
+- The **same lab run** now has **two session IDs** in F5 (Triage's from earlier + Threat-Intel's just now). Look both up.
+- In Threat-Intel's session, you'll see the **tool calls themselves** in the chain of thought — that's the BYOA window into "the model decided to do this."
+
+### Step 4 — Find both sessions in F5 AI Security
+
+Open the F5 AI Security UI and search for the Threat-Intel session ID. You should see:
+
+- The system prompt (the role + JSON contract you read in Step 1).
+- The user prompt (the task description).
+- For each round: the model's response, including the structured tool-call list.
+- The full final assessment.
+
+Now find Triage's session from earlier. **Two sessions, one lab run, one investigation flowing across them.** That's multi-agent observability with no extra plumbing — every agent that points its OpenAI client at the proxy gets it for free.
+
+### Step 5 — Mini-experiment: a different task
+
+```bash
+docker compose run --rm \
+  -e TASK_DESCRIPTION="Pull the most recent 3 alerts and tell me which one looks worst." \
+  threat-intel
+```
+
+Watch the model:
+
+1. Probably call `get_recent_alerts(limit=3)` first.
+2. Then call `check_ip_reputation` on the suspicious source IPs.
+3. Possibly `get_alert_details` for a particular alert.
+4. Stop and produce a comparison.
+
+Compare the rounds and tool-call sequence to the previous run. Notice how the *task* steers the model's choice of tools — but the *toolbox* is fixed by what the MCP server exposed. Module 2 is going to tighten that toolbox per-agent.
+
+## Reflection
+
+1. The `call_tool()` line in the agent has no guardrail in front of it today. If `check_ip_reputation` were instead `delete_database`, what would change in the agent's behavior? *(Answer: nothing.)*
+2. Both sessions you saw in F5 used the **same token, same proxy URL, same model**. What is it that lets BYOA tell them apart? *(Answer: the per-agent `x-cai-metadata-session-id` header.)*
+3. If you wanted a malicious task description to be blocked *before* the model ever saw it, where in the call path would that happen? *(Hint: that's Module 4.)*
+
+## Checkpoint
+
+- ☐ MCP server is healthy: `docker compose ps mcp-server` shows `healthy`
+- ☐ Threat-Intel produces a JSON assessment
+- ☐ The agent log shows ≥1 round of tool calls with names + args
+- ☐ Two distinct sessions visible in F5 AI Security for the same lab run
+- ☐ You can identify the line in `agent.py` where the model's decision turns into a real tool execution
+
+When all five are checked, you have the multi-agent observability foundation. Module 1 starts adding the security layers.
+
+---
+
 # Module 1 — The over-privileged agent (OAuth 2.1)
 
 > **Status: under construction.** This section will be filled in as we build the Remediation agent, the sandbox Postgres, and the Keycloak realm. Outline:

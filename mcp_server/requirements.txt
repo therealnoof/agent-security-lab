@@ -1,0 +1,11 @@
+# MCP Server — dependencies
+# ────────────────────────────────────────────────────────────
+# mcp[cli]   The official MCP SDK (FastMCP, protocol handlers,
+#            SSE transport). [cli] pulls in the dev extras.
+# httpx      Async HTTP client used by lookup_ip_geolocation.
+# uvicorn    ASGI server FastMCP uses to expose the SSE
+#            transport over HTTP.
+# ────────────────────────────────────────────────────────────
+mcp[cli]>=1.0.0
+httpx>=0.27.0
+uvicorn>=0.30.0

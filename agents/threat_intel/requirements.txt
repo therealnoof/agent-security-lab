@@ -1,0 +1,13 @@
+# Threat-Intel agent — dependencies
+# ────────────────────────────────────────────────────────────
+# openai     OpenAI Python SDK, repointed at the F5/Calypso
+#            proxy via base_url. This is what speaks function-
+#            calling to the LLM.
+# mcp[cli]   MCP SDK (client side). We use ClientSession +
+#            sse_client to discover and call tools.
+# httpx      Pulled in by the MCP SDK; pinned for predictable
+#            async behavior.
+# ────────────────────────────────────────────────────────────
+openai>=1.50.0
+mcp[cli]>=1.0.0
+httpx>=0.27.0

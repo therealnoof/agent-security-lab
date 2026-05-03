@@ -63,24 +63,25 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ─── MCP Server (extended SOC + remediation tools) ────────
+  # ─── MCP Server (SOC tools, vendored from Phase 1) ────────
+  # Module 0.5 ships only the SOC investigation tools and no
+  # auth — any client on the docker network can call any tool.
+  # Module 1 will add OAuth introspection (Keycloak dependency)
+  # and Module 2 will add per-agent capability scoping.
+  # Module 1+ will also add the destructive remediation tools
+  # plus the Postgres dependency.
   mcp-server:
     build:
       context: ./mcp_server
     container_name: asl-mcp-server
-    environment:
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM}
-      - POSTGRES_HOST=postgres
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "8000:8000"
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/sse', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ─── Agents ────────────────────────────────────────────────
@@ -120,6 +121,11 @@ services:
       - ALERT_TEXT=${ALERT_TEXT:-}
     restart: "no"
 
+  # Threat-Intel uses the MCP server's SOC tools through the
+  # OpenAI tool-calling protocol (see agents/threat_intel/agent.py).
+  # No OAuth yet — that arrives in Module 1.
+  # Run with: `docker compose run --rm threat-intel`
+  # Override the task with: `-e TASK_DESCRIPTION="..."`
   threat-intel:
     build:
       context: ./agents/threat_intel
@@ -129,12 +135,12 @@ services:
         required: false
     environment:
       - AGENT_NAME=threat-intel
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
-      - MCP_SERVER_URL=http://mcp-server:8000
+      - MCP_SERVER_URL=http://mcp-server:8000/sse
+      - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
     depends_on:
       mcp-server:
-        condition: service_started
-    restart: unless-stopped
+        condition: service_healthy
+    restart: "no"
 
   remediation:
     build:
