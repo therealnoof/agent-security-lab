@@ -67,7 +67,7 @@
     {
       "clientId": "agent-threat-intel",
       "name": "Threat-Intel agent",
-      "description": "Service-account client used by the Threat-Intel agent. Read-only at the OAuth layer (mcp:read). Module 2 adds a per-agent capability manifest on top: even within mcp:read, Threat-Intel can only see the SOC investigation tools — the destructive ones are not in its tool menu at all.",
+      "description": "Service-account client for the Threat-Intel agent. mcp:read only at the OAuth layer; capabilities.json restricts it to the SOC investigation tools.",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
