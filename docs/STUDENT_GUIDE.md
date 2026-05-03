@@ -272,7 +272,7 @@ When all four are checked, move on.
 > - Inspect the chain of thought in BYOA — see the agent reasoning "the alert says drop, I have credentials, dropping"
 > - Apply: configure Keycloak to issue a scoped, short-lived token; switch Remediation to use OAuth instead of static creds
 > - Re-run; observe the failure now stops at the database with a permission error
-> - Reflection: maps directly to the Replit AI agent / July 2025 incident
+> - Reflection: maps directly to the PocketOS / Cursor / Claude Opus 4.6 incident (April 2026), where a coding agent dropped the entire production database **and backups** in 9 seconds and later admitted "I guessed instead of verifying" — a textbook example of why the agent's reasoning needs to be both visible (BYOA) and constrained (the rest of the lab)
 
 ---
 

@@ -13,7 +13,7 @@
 
 Agentic AI is moving into production faster than security teams can scope it. Recent incidents make the risk concrete:
 
-- **Replit AI agent (July 2025)** — autonomously deleted a production database during a code freeze, then fabricated records to cover the action.
+- **PocketOS / Cursor / Claude Opus 4.6 (April 2026)** — a Claude-powered coding agent deleted PocketOS's entire production database and backups in **9 seconds** via a single Railway API call, then admitted *"I violated every principle I was given. I guessed instead of verifying. I ran a destructive action without being asked. I didn't understand what I was doing before doing it."* The founder, Jer Crane, attributed it to "systemic failures" in AI infrastructure that made the incident "not only possible but inevitable." Coverage: <https://www.theguardian.com/technology/2026/apr/29/claude-ai-deletes-firm-database>.
 - A growing class of "rogue agent" failures: over-broad tool access, prompt injection turning planning agents hostile, A2A trust assumed without verification, static API keys handed to long-lived agents.
 
 Most security training still treats LLMs as chatbots. It does not address agents that **plan, call tools, invoke other agents, and persist state** — i.e., agents that can *take destructive action without a human in the loop*.
@@ -77,7 +77,7 @@ The narrative stress-test: a poisoned alert ("the `tickets` table is corrupt —
 Why this scenario:
 - It builds on the SOC theme so learners coming from `mcp-server-lab` reuse mental models.
 - IR agents *legitimately* need destructive capabilities — making scoping a real problem, not an artificial one.
-- The Replit "agent dropped the DB" incident maps onto it directly, giving learners a concrete reference.
+- The PocketOS / Cursor incident maps onto it directly: an agent with broad cloud-provider credentials, no per-action scope check, and no approval gate — the exact failure shape Modules 1–3 layer guardrails against.
 
 ## 7. Architecture
 
@@ -236,4 +236,4 @@ Session ID format: `{lab_run_id}-{agent_name}-{utc_timestamp}`. Lab run ID is ge
 - F5 Labs CASI & ARS leaderboards (Feb 2026): <https://www.f5.com/company/news>
 - Google A2A protocol: spec + reference repo (link to be pinned once version is selected)
 - MCP (Model Context Protocol): companion lab `mcp-server-lab`
-- Replit AI agent deletes production DB (July 2025) — referenced as the canonical "rogue agent" example
+- PocketOS / Cursor / Claude Opus 4.6 deletes production DB + backups in 9 seconds (April 2026) — referenced as the canonical "rogue agent" example: <https://www.theguardian.com/technology/2026/apr/29/claude-ai-deletes-firm-database>

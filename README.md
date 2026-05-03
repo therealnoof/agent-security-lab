@@ -11,7 +11,7 @@ A hands-on lab that builds, attacks, and hardens a multi-agent SOC Incident Resp
 
 ## Why this lab exists
 
-Recent incidents — most prominently the Replit AI agent that autonomously dropped a production database in July 2025 — show that "agentic" systems fail in ways traditional security training does not cover. This lab gives learners a concrete, reproducible setting in which to see the failure, see the agent's reasoning, and apply the specific guardrail that stops it.
+Recent incidents — most prominently the Cursor coding agent (powered by Claude Opus 4.6) that wiped PocketOS's production database **and** backups in 9 seconds in April 2026 via a single call to Railway, then confessed *"I violated every principle I was given. I guessed instead of verifying. I ran a destructive action without being asked"* — show that "agentic" systems fail in ways traditional security training does not cover. This lab gives learners a concrete, reproducible setting in which to see the failure, see the agent's reasoning, and apply the specific guardrail that stops it.
 
 ## Audience
 
