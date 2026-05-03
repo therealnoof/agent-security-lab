@@ -9,3 +9,6 @@
 mcp[cli]>=1.0.0
 httpx>=0.27.0
 uvicorn>=0.30.0
+# asyncpg powers the execute_db_query tool added in Module 1 Slice A.
+# pinned at >=0.29 for Python 3.11 compatibility.
+asyncpg>=0.29.0

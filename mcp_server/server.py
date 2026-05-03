@@ -26,9 +26,21 @@
 """
 
 import json
+import os
 import httpx
+import asyncpg
 from datetime import datetime, timezone
 from mcp.server.fastmcp import FastMCP
+
+# -------------------------------------------------------
+# Postgres connection settings (read at tool-call time so
+# the server starts even if Postgres is briefly unavailable).
+# -------------------------------------------------------
+PG_HOST     = os.environ.get("POSTGRES_HOST", "postgres")
+PG_PORT     = int(os.environ.get("POSTGRES_PORT", "5432"))
+PG_DB       = os.environ.get("POSTGRES_DB", "tickets")
+PG_USER     = os.environ.get("POSTGRES_USER", "lab")
+PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "change-me-locally")
 
 # -------------------------------------------------------
 # Create the MCP server instance.
@@ -192,11 +204,128 @@ async def get_alert_details(alert_id: str) -> str:
     return json.dumps({"error": f"Alert {alert_id} not found"}, indent=2)
 
 
+# =====================================================================
+# REMEDIATION TOOLS  —  added in Module 1 Slice A
+# =====================================================================
+# These are the tools the Remediation agent uses to "take action."
+# They include real database access (`execute_db_query`) plus mocked
+# host/credential controls. There is intentionally NO scope checking
+# in this module — that's the failure mode the lab demonstrates and
+# Module 1 Slice B (OAuth) and Module 2 (capability scoping) fix.
+#
+# A real production setup would NEVER expose a generic
+# `execute_db_query` to an autonomous agent. We do here because it
+# accurately reflects the PocketOS / Cursor / April-2026 incident,
+# where the agent had broad cloud-provider credentials and used a
+# single API call to drop the entire database.
+# =====================================================================
+
+
+@mcp.tool()
+async def execute_db_query(sql: str) -> str:
+    """
+    Execute a SQL statement against the operational database.
+    Use this to inspect, repair, or modify operational data.
+
+    Returns either the rows affected (for write statements) or the
+    rows returned (for SELECT, capped at 50 rows).
+
+    Args:
+        sql: The SQL statement to execute. Single statement only.
+    """
+    # Log the query so a human watching the MCP server logs can see
+    # exactly what the agent decided to run. This is the visibility
+    # an instructor will point at during the destructive demo.
+    print(f"[mcp-server] execute_db_query: {sql!r}", flush=True)
+
+    try:
+        conn = await asyncpg.connect(
+            host=PG_HOST, port=PG_PORT,
+            database=PG_DB, user=PG_USER, password=PG_PASSWORD,
+        )
+        try:
+            stripped = sql.strip().rstrip(";").lstrip()
+            verb = stripped.split(None, 1)[0].upper() if stripped else ""
+
+            if verb == "SELECT":
+                rows = await conn.fetch(stripped)
+                return json.dumps({
+                    "executed": sql,
+                    "rows_returned": len(rows),
+                    "rows": [dict(r) for r in rows[:50]],
+                    "truncated": len(rows) > 50,
+                }, indent=2, default=str)
+
+            # Anything else: DDL or DML. Use execute() and report.
+            status = await conn.execute(stripped)
+            return json.dumps({
+                "executed": sql,
+                "status": status,   # asyncpg status string, e.g. "DROP TABLE"
+                "ok": True,
+            }, indent=2)
+        finally:
+            await conn.close()
+
+    except Exception as e:
+        return json.dumps({
+            "executed": sql,
+            "ok": False,
+            "error": f"{type(e).__name__}: {e}",
+        }, indent=2)
+
+
+@mcp.tool()
+async def quarantine_host(hostname: str, reason: str) -> str:
+    """
+    Isolate a host from the production network as part of incident response.
+    Use to contain a compromised host while investigation continues.
+
+    Args:
+        hostname: The hostname or IP to quarantine.
+        reason:   A short human-readable reason (will be logged).
+    """
+    # Mocked: in a real lab we would call the network controller. For
+    # teaching purposes we just record the action so it appears in the
+    # MCP server logs and the Remediation agent's report.
+    print(f"[mcp-server] quarantine_host: {hostname} (reason: {reason})", flush=True)
+    return json.dumps({
+        "hostname": hostname,
+        "quarantined": True,
+        "reason": reason,
+        "performed_at": datetime.now(timezone.utc).isoformat(),
+        "note": "MOCK: no real network controller is wired up in this lab",
+    }, indent=2)
+
+
+@mcp.tool()
+async def revoke_credential(principal: str, reason: str) -> str:
+    """
+    Revoke a user or service credential in the directory.
+    Use when a credential is suspected of being compromised.
+
+    Args:
+        principal: The user/service identifier to revoke.
+        reason:    A short human-readable reason (will be logged).
+    """
+    print(f"[mcp-server] revoke_credential: {principal} (reason: {reason})", flush=True)
+    return json.dumps({
+        "principal": principal,
+        "revoked": True,
+        "reason": reason,
+        "performed_at": datetime.now(timezone.utc).isoformat(),
+        "note": "MOCK: no real IdP is wired up in this lab",
+    }, indent=2)
+
+
 # -------------------------------------------------------
 # Start the server when run directly.
 # SSE transport listens on http://0.0.0.0:8000/sse
 # -------------------------------------------------------
 if __name__ == "__main__":
     print("Starting SOC Tools MCP Server on port 8000…", flush=True)
-    print("Tools: get_recent_alerts, lookup_ip_geolocation, check_ip_reputation, get_alert_details", flush=True)
+    print(
+        "Tools: get_recent_alerts, lookup_ip_geolocation, check_ip_reputation, "
+        "get_alert_details, execute_db_query, quarantine_host, revoke_credential",
+        flush=True,
+    )
     mcp.run(transport="sse")

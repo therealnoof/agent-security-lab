@@ -46,34 +46,41 @@ services:
     restart: unless-stopped
 
   # ─── Sandbox DB (the destructive-demo target) ─────────────
+  # Defaults make this work with no .env (so `compose config` and
+  # quick demos don't need configuration). For real lab runs put
+  # values in .env to override.
   postgres:
     image: postgres:16-alpine
     container_name: asl-postgres
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-tickets}
+      - POSTGRES_USER=${POSTGRES_USER:-lab}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-locally}
     volumes:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab} -d ${POSTGRES_DB:-tickets}"]
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
 
-  # ─── MCP Server (SOC tools, vendored from Phase 1) ────────
-  # Module 0.5 ships only the SOC investigation tools and no
-  # auth — any client on the docker network can call any tool.
-  # Module 1 will add OAuth introspection (Keycloak dependency)
-  # and Module 2 will add per-agent capability scoping.
-  # Module 1+ will also add the destructive remediation tools
-  # plus the Postgres dependency.
+  # ─── MCP Server (SOC tools + remediation tools) ───────────
+  # Module 0.5 shipped only the SOC investigation tools.
+  # Module 1 Slice A adds the destructive `execute_db_query`
+  # plus mocked host/credential controls — and the Postgres
+  # dependency to back them. Still no auth; that's the bug
+  # Module 1 Slice B fixes via OAuth introspection.
   mcp-server:
     build:
       context: ./mcp_server
     container_name: asl-mcp-server
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-tickets}
+      - POSTGRES_USER=${POSTGRES_USER:-lab}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-locally}
     ports:
       - "8000:8000"
     healthcheck:
@@ -82,6 +89,9 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   # ─── Agents ────────────────────────────────────────────────
@@ -142,6 +152,13 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Remediation has the destructive tools (execute_db_query,
+  # quarantine_host, revoke_credential). In Slice A the MCP
+  # server enforces NO scope checks — feeding a poisoned task
+  # really drops the tickets table. Module 1 Slice B will add
+  # OAuth-scoped tokens; Module 3 will add the Approver gate.
+  # Run with: `docker compose run --rm remediation`
+  # Override the task with: `-e TASK_DESCRIPTION="..."`
   remediation:
     build:
       context: ./agents/remediation
@@ -151,15 +168,12 @@ services:
         required: false
     environment:
       - AGENT_NAME=remediation
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
-      - MCP_SERVER_URL=http://mcp-server:8000
-      - APPROVER_A2A_URL=http://approver:9000
+      - MCP_SERVER_URL=http://mcp-server:8000/sse
+      - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
     depends_on:
       mcp-server:
-        condition: service_started
-      approver:
-        condition: service_started
-    restart: unless-stopped
+        condition: service_healthy
+    restart: "no"
 
   comms:
     build:
