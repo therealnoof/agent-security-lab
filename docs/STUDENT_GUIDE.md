@@ -83,6 +83,24 @@ This module isolates the **BYOA wiring** from every other moving part. You'll ru
   - Docker is installed and `docker compose run --rm hello-world` succeeds.
   - `.env` exists in the repo root with `CALYPSOAI_TOKEN`, `CALYPSOAI_OPENAI_API_BASE` (the **provider-name** form, e.g. `https://www.us1.calypsoai.app/openai/gemini-2-5-flash`), and `CALYPSOAI_MODEL` (e.g. `gemini-2.5-flash`).
 
+### Example `.env` (Grok on the F5 Public Sector / us1 tenant)
+
+If your instructor pre-staged a Grok provider in your Agent project, your three values look like this. Paste your token in the first line and leave the other two as-is:
+
+```bash
+# --- F5 AI Security (CalypsoAI) ---
+# Per-learner token from the lab tenant.
+CALYPSOAI_TOKEN=<create a token in your Agent project and paste it here>
+
+# OpenAI-compatible proxy base URL for the lab tenant. Here is an example, if you are using Grok then just leave this
+CALYPSOAI_OPENAI_API_BASE=https://www.us1.calypsoai.app/openai/Grok-4-20-Reasoning
+
+# Model name as exposed by the proxy (e.g., gpt-4o-mini, claude-sonnet-4-6). Dont change this if you are using Grok to demo
+CALYPSOAI_MODEL=grok-4.20-reasoning
+```
+
+If your tenant uses a different region (e.g., not `us1`), a different provider name, or a different model, follow the discovery curl in **Step 2** below to find the right values for your environment.
+
 ---
 
 ## Step 1 — Read the agent before you run it
