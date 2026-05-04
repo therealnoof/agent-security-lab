@@ -39,6 +39,13 @@
 
 set -euo pipefail
 
+# Some root shells (sudo -i, raw root login on UDF, cloud-init)
+# don't set HOME, which the upstream Coder install script needs.
+# Default to /root if missing — we won't actually use it for the
+# user-facing install steps below; we only need it for the
+# upstream installer's bookkeeping.
+export HOME="${HOME:-/root}"
+
 # --- Tunable defaults --------------------------------------
 PORT="${CODE_SERVER_PORT:-8443}"
 TARGET_USER="${CODE_SERVER_USER:-ubuntu}"
