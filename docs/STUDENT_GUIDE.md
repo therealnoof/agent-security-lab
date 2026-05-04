@@ -480,7 +480,6 @@ Open in your editor:
 #### Step 2 — Bring up the new infrastructure
 
 ```bash
-git pull
 docker compose up -d postgres
 docker compose up -d --build mcp-server     # rebuild so it picks up the new tools
 docker compose ps postgres mcp-server       # both should be "healthy"
@@ -650,7 +649,6 @@ Open in your editor:
 #### Step 2 — Bring up Keycloak
 
 ```bash
-git pull
 docker compose up -d keycloak
 docker compose ps keycloak
 ```
@@ -889,7 +887,6 @@ Open in your editor:
 The realm changed (new `agent-threat-intel` client) and the MCP server image changed (new files). Rebuild:
 
 ```bash
-git pull
 docker compose down keycloak                            # because realm import only runs on a fresh volume
 docker volume rm agent-security-lab_keycloak-data
 docker compose up -d keycloak                            # ~30-45s for re-import
@@ -1106,8 +1103,6 @@ Open in your editor:
 The realm changed (two new clients) so Keycloak needs a fresh import. Comms is a new service. Triage's image needs rebuilding for the A2A code.
 
 ```bash
-git pull
-
 docker compose down keycloak
 docker volume rm agent-security-lab_keycloak-data
 docker compose up -d keycloak
