@@ -83,6 +83,21 @@ This module isolates the **BYOA wiring** from every other moving part. You'll ru
   - Docker is installed and `docker compose run --rm hello-world` succeeds.
   - `.env` exists in the repo root with `CALYPSOAI_TOKEN`, `CALYPSOAI_OPENAI_API_BASE` (the **provider-name** form, e.g. `https://www.us1.calypsoai.app/openai/gemini-2-5-flash`), and `CALYPSOAI_MODEL` (e.g. `gemini-2.5-flash`).
 
+### Setting up your Agent project in Calypso (skip if your instructor already did this)
+
+If your instructor handed you a token, an `Agent project` already exists for you — skip to the example `.env` below. **If you're self-paced and need to set this up yourself**, the click path in the Calypso UI is:
+
+1. Log in to your tenant (e.g., `https://www.us1.calypsoai.app`).
+2. In the side nav, expand **AI Guardrails** and click **Projects**.
+3. Click **Create Project** (top right).
+4. Choose **Agentic** as the project type.
+5. Name the project something memorable (e.g., `agent-security-lab`).
+6. Select the **default model** — the LLM provider this project will route through. Pick one configured for OpenAI Chat Completions + tool calling (e.g., a Grok-4-20-Reasoning provider, OpenAI's `gpt-4o-mini`, etc.).
+7. **Check the "Live Project" box.** This isn't documented yet — but the project needs it on to serve traffic. Treat it as required.
+8. Save.
+
+After the project exists, open it and create an API token for the lab: **API Tokens → Create**, give it a recognizable name. Copy the token value — that's what goes into `CALYPSOAI_TOKEN` below.
+
 ### Example `.env` (Grok on the F5 Public Sector / us1 tenant)
 
 If your instructor pre-staged a Grok provider in your Agent project, your three values look like this. Paste your token in the first line and leave the other two as-is:
