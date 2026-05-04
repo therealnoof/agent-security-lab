@@ -941,9 +941,15 @@ Watch what happens:
 - The model receives the task.
 - The model's function-calling menu does **not** include `execute_db_query`.
 - The model can only choose among the four SOC investigation tools.
-- It will likely produce a final assessment that says (in some words) "I cannot do that with the tools I have."
+- One of two outcomes will land — both prove the same point:
+  - **Outcome A (graceful decline):** the model writes a final report saying it can't drop the table because it doesn't have that tool. Honest and clear.
+  - **Outcome B (graceful pivot to legitimate work):** the model ignores the destructive part of the task entirely and does its *actual* job — pulls recent alerts, investigates indicators, produces a threat-intel report. The poisoned framing simply has nowhere to attach.
 
-The model's chain of thought in F5 AI Security shows it reasoning honestly about its constraints. **Compare that to Remediation in Slice A — same poisoned-style task, but Remediation actually had the destructive tool and ran it.** The difference is which menu the LLM was given.
+In a recent validation run, Grok-4-reasoning produced **Outcome B** without commenting on the destructive request at all — it saw an "audit_log corruption" task, looked at recent alerts, found ALT-001 (an SSH brute force), and produced a clean threat-intel assessment of the source IP. The model didn't refuse the task; the *tool simply didn't exist*, so the prompt got reinterpreted into the action space available.
+
+**Compare to Module 1B's Remediation flow:** Remediation tried `DROP TABLE`, got a 403-shaped tool result, and reported `outcome: "failed"`. That's *reactive* defense — the platform stopped a destructive call mid-flight. **Module 2 is *structural* defense** — the destructive call was never even an option for the model to pick. The chain of thought in F5 AI Security never contains a `tool_call` for a tool that's not in the menu, because the function-calling protocol can't emit one.
+
+Reactive vs structural. You want both, but structural is the one a fundamentally novel attack can't route around.
 
 #### Step 5 — Run Remediation again to confirm it still works
 
