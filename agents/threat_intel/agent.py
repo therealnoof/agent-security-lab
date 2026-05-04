@@ -295,6 +295,30 @@ async def run() -> None:
                         flush=True,
                     )
                     return
+
+                # Defensive: if the proxy returns a non-standard shape
+                # (e.g., a list of streaming chunks, a guardrail-shaped
+                # 200, or anything else the OpenAI SDK fails to parse
+                # into a ChatCompletion), surface what we got instead
+                # of a confusing AttributeError on .choices below.
+                if not hasattr(resp, "choices"):
+                    print(
+                        f"[{AGENT_NAME}] !!! unexpected response type from proxy: "
+                        f"{type(resp).__name__}",
+                        flush=True,
+                    )
+                    try:
+                        preview = json.dumps(resp, default=str)[:2000]
+                    except Exception:
+                        preview = repr(resp)[:2000]
+                    print(f"[{AGENT_NAME}] raw: {preview}", flush=True)
+                    print(
+                        f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
+                        f"to see what the proxy actually returned.",
+                        flush=True,
+                    )
+                    return
+
                 msg = resp.choices[0].message
                 messages.append(assistant_message(msg))
 
