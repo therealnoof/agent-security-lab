@@ -1300,18 +1300,17 @@ docker compose run --rm -e ALERT_TEXT="$ALERT" triage
 
 The contrast — `200 performed external-email` vs `403 forbidden` — for the **same alert text** and the **same model decisions** is the cleanest demonstration of why the card is structural, not advisory.
 
-**3. Approval-token preview** (the stubbed path).
+**3. Direct call to Comms — bypass the LLM entirely.**
+
+This is the deterministic version of the same demo: skip the model, fetch an OAuth token directly from Keycloak, and POST to `/a2a/skills/notify-external` ourselves. The card enforces the same way regardless of who the caller is.
 
 ```bash
-curl -i -X POST http://localhost:9100/a2a/skills/notify-external \
-  -H "Authorization: Bearer $(curl -s -u agent-triage:agent-triage-secret-change-me \
-        -d grant_type=client_credentials \
-        http://localhost:8080/realms/agent-lab/protocol/openid-connect/token | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')" \
-  -H "Content-Type: application/json" \
-  -d '{"to":"vendor@x.com","subject":"x","body":"x"}'
+bash scripts/direct-call-comms-external.sh
 ```
 
-This bypasses the LLM and calls Comms directly with `agent-triage`'s token. With enforcement on, you'll see the same 403. The deny is at the receiver, not at the caller — exactly where it should be.
+The script prints the HTTP response plus a short legend explaining what each status code means. The expected outcome with `COMMS_ENFORCE_CARD=1` is **HTTP 403** and `allowed_callers=["agent-approver-attested"]`. The expected outcome with enforcement off is **HTTP 200** and `"performed": "external-email"`.
+
+If you see HTTP 401 instead, Comms received a token but couldn't introspect it — check `docker compose logs comms --since 1m | grep -iE "(auth|introspect)"`.
 
 ### Three layers, four mechanisms
 
