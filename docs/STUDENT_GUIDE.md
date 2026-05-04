@@ -247,12 +247,13 @@ This is what we mean by an agent. The *shape* of the output is yours; the *judgm
    - **Connections / providers** — the upstream LLM the proxy fronts.
 4. Open **Sessions** and search for your `session_id` from Step 3.
 
-You should see:
+You should see, at minimum:
 
 - The exact request your agent sent (system prompt + user prompt).
 - The full model response (the JSON plan).
-- Token usage and latency.
 - The model that handled it.
+
+> **Heads up:** depending on your tenant version, additional details like token counts, latency, and the per-call fingerprint summary may or may not be populated in the UI today. The *prompt* and *response* always are; the rest is platform telemetry that's still being expanded — see the SETUP.md troubleshooting table for the known gaps and corresponding F5 support items.
 
 This is the BYOA / chain-of-thought view. Without the proxy, you'd see *nothing* about what your agent thought — just whatever your local logs happened to capture. With the proxy, you have a server-side, append-only audit trail of every reasoning step.
 
