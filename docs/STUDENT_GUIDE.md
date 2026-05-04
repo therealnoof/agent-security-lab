@@ -172,6 +172,24 @@ curl -sS -H "Authorization: Bearer $CALYPSOAI_TOKEN" \
 
 Use the `name` field from the JSON for the URL, and the `inputs.model` field for `CALYPSOAI_MODEL`.
 
+#### What the populated lines should look like
+
+This example uses values from the F5 **Public Sector** tenant. **Your environment will differ** — different region in the hostname, a different provider name from your project, a different token, possibly a different model. The *shape* is what matters:
+
+```bash
+# ─── F5 AI Security (CalypsoAI) ───
+CALYPSOAI_TOKEN=MDFhYjJjZDM0ZWY1NjZhYi04YzlkLTBlMWYtMjMzNC01NjZl/Z3JhbnRzLnYxLmI4N2Q3MTk1
+CALYPSOAI_OPENAI_API_BASE=https://www.publicsector.calypsoai.app/openai/openai-gpt-4o-mini
+CALYPSOAI_MODEL=gpt-4o-mini
+```
+
+Notes on each line:
+- `CALYPSOAI_TOKEN` is a long base64-ish string from **Projects → your Agent project → API tokens**. Treat it like any other secret — never commit `.env`. The example above is a fake; yours will be ~80 characters.
+- `CALYPSOAI_OPENAI_API_BASE` follows the **`https://www.<region>.calypsoai.app/openai/<PROVIDER-NAME>`** shape. The region in your hostname matches your tenant (`us1`, `publicsector`, etc.). The path segment after `/openai/` is the *provider name* — the same one in the `name` field of the `/backend/v1/providers` response. **Common mistake**: using the project name here instead of the provider name; that returns 404.
+- `CALYPSOAI_MODEL` is whatever the provider exposes. For OpenAI providers: `gpt-4o-mini`, `gpt-4o`, etc. For Gemini providers: `gemini-2.5-flash`. For Anthropic: `claude-sonnet-4-6`. Match the provider's `inputs.model` field.
+
+Save the file, then continue to Step 3.
+
 > If you used `set -a; source .env; set +a` in an earlier shell session, **don't** — the repo's compose now reads `.env` directly. Old shell exports can override your edits silently. See `SETUP.md §A3.1`.
 
 ---
