@@ -77,6 +77,8 @@ This module isolates the **BYOA wiring** from every other moving part. You'll ru
 
 ## Prerequisites
 
+> **Using a prebuilt lab environment (e.g., F5 UDF)?** All the infrastructure plumbing — Docker, this repo, the bootstrap script, the local images — has been done for you by the instructor. **Your only setup task is filling in the three CalypsoAI variables in `.env`** from your own Calypso tenant's Agent project (token + provider URL + model id). Skip the rest of the install and jump to **Step 2 — Configure your `.env`** below.
+
 - You finished [`SETUP.md`](../SETUP.md). Specifically:
   - Docker is installed and `docker compose run --rm hello-world` succeeds.
   - `.env` exists in the repo root with `CALYPSOAI_TOKEN`, `CALYPSOAI_OPENAI_API_BASE` (the **provider-name** form, e.g. `https://www.us1.calypsoai.app/openai/gemini-2-5-flash`), and `CALYPSOAI_MODEL` (e.g. `gemini-2.5-flash`).
