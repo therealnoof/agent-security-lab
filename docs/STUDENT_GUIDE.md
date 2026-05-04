@@ -91,7 +91,14 @@ Open `/home/ubuntu/agent-security-lab/agents/triage/agent.py` in your editor. Do
 
 > **Path note:** on F5 UDF (and most prebuilt lab nodes) the repo lives at `/home/ubuntu/agent-security-lab/`. All file paths in this guide are relative to that root unless otherwise noted; if you cloned to a different directory, prefix accordingly.
 >
-> **No editor on the lab node?** If your instructor pre-staged code-server (browser-based VS Code), it's reachable at **`https://<lab-host>:8443`** — open that, log in with the password you were given, and **File → Open Folder → `/home/ubuntu/agent-security-lab`**. If it's not pre-staged, an instructor can set it up with `sudo bash scripts/install-code-server.sh` (see the README's "Optional — browser-based VS Code" section).
+> **Need a code editor?** If you're on **F5 UDF**, browser-based VS Code is pre-staged for you:
+> 1. In your UDF lab session, go to **Access Methods**.
+> 2. Click **Coder**.
+> 3. A browser tab opens at the code-server login screen.
+> 4. The password is in the **Documentation** section of that same Access Method — copy and paste it.
+> 5. Once logged in: **File → Open Folder → `/home/ubuntu/agent-security-lab`**.
+>
+> If you're self-paced (not on UDF), the same code-server is reachable directly at `https://<your-lab-host>:8443`. If it isn't running, an instructor can install it with `sudo bash scripts/install-code-server.sh` (see the README's "Optional — browser-based VS Code" section).
 
 **1.1 Configuration from environment** (top of file, lines 41–54):
 

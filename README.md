@@ -63,6 +63,8 @@ sudo CODE_SERVER_PASSWORD='your-pick' bash scripts/install-code-server.sh
 
 The script prints the access URL and password at the end. Open the URL in a remote browser, accept the cert warning, log in, then **File → Open Folder → `/home/ubuntu/agent-security-lab`**. Make sure inbound TCP `8443` is open in your cloud security group.
 
+**On F5 UDF**, learners reach this through **Access Methods → Coder**, and find the password in the **Documentation** section of that same Access Method — they don't need the raw URL or to handle the cert warning themselves.
+
 ## Reset between runs
 
 To wipe lab state (containers, Postgres tables, Keycloak realm) and start over from Module 0 — preserves your `.env`:
