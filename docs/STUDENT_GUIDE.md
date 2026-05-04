@@ -87,7 +87,9 @@ This module isolates the **BYOA wiring** from every other moving part. You'll ru
 
 ## Step 1 — Read the agent before you run it
 
-Open `agents/triage/agent.py` in your editor. Don't skim. There are four parts that matter — find each one before running anything.
+Open `/home/ubuntu/agent-security-lab/agents/triage/agent.py` in your editor. Don't skim. There are four parts that matter — find each one before running anything.
+
+> **Path note:** on F5 UDF (and most prebuilt lab nodes) the repo lives at `/home/ubuntu/agent-security-lab/`. All file paths in this guide are relative to that root unless otherwise noted; if you cloned to a different directory, prefix accordingly.
 
 **1.1 Configuration from environment** (top of file, lines 41–54):
 
