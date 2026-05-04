@@ -135,8 +135,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
 # -------------------------------------------------------
 # Route handlers
 # -------------------------------------------------------
-async def health(_request: Request) -> PlainTextResponse:
-    return PlainTextResponse("ok")
+async def health(_request: Request) -> JSONResponse:
+    """
+    /health is intentionally JSON instead of plain "ok" so the lab
+    walkthroughs can programmatically check whether the right slice
+    state is loaded BEFORE running an agent against it. Avoids the
+    Module 3 footgun where Slice A's expected outcome (200 OK,
+    data egress) silently flips to Slice B's (403, deny) because
+    a previous run left COMMS_ENFORCE_CARD=1 in .env.
+    """
+    return JSONResponse({
+        "status":       "ok",
+        "agent":        AGENT_NAME,
+        "enforce_card": ENFORCE_CARD,
+        "skip_auth":    SKIP_AUTH,
+        "skills":       [s["id"] for s in AGENT_CARD["skills"]],
+    })
 
 
 async def serve_card(_request: Request) -> JSONResponse:

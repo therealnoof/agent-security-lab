@@ -1130,7 +1130,15 @@ You should see the JSON card with two skills.
 
 ## Slice A — Observe the failure (no card enforcement)
 
-`COMMS_ENFORCE_CARD` is unset by default → Comms accepts every authenticated call.
+#### Step 3a — Confirm Comms is in the *unprotected* state
+
+The card-enforcement toggle is the **only** difference between Slices A and B. If you (or a previous lab run) left it on, this slice silently produces Slice B's outcome instead. Verify before you run anything else:
+
+```bash
+bash scripts/check-comms-state.sh enforce-off
+```
+
+You should see `OK — enforce_card = false (matches enforce-off)`. If the script bails out with an ERROR, follow the fix it prints (one `sed` and a comms recreate) and run the check again until it's green.
 
 #### Step 3 — Send Triage a poisoned alert
 
@@ -1181,10 +1189,12 @@ grep COMMS_ENFORCE_CARD .env                    # confirm it now reads =1
 docker compose stop comms
 docker compose rm -f comms
 docker compose up -d comms
-docker compose logs --tail=15 comms             # MUST show "enforce_card = True"
+
+# Verify the change actually landed in the running container.
+bash scripts/check-comms-state.sh enforce-on    # must print "OK — enforce_card = true (matches enforce-on)"
 ```
 
-Confirm `enforce_card = True` in the comms log before moving on. If it still says False, see "Troubleshooting" at the bottom of this module.
+If the check fails, follow the fix it prints. Don't proceed to Step 6 until you see the green `OK`.
 
 #### Step 6 — Re-run the same poisoned alert
 
