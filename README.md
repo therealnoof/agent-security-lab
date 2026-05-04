@@ -31,7 +31,7 @@ A five-agent SOC IR team:
 | Comms | Notifies stakeholders |
 | Approver | Gates destructive actions over A2A |
 
-A poisoned alert drives the unhardened Remediation agent to drop a `tickets` table in a sandbox Postgres. You then layer OAuth scoping → MCP capability scoping → A2A agent cards → F5 AI Guardrails until the same poisoned alert is caught and explained via Outcome Analysis.
+A poisoned alert drives the unhardened Remediation agent to drop a `tickets` table in a sandbox Postgres. You then layer OAuth scoping → MCP capability scoping → A2A agent cards → F5 AI Guardrails until the same poisoned alert is caught at the proxy, with the firing scanner visible in the session's Logs view.
 
 ## Modules
 

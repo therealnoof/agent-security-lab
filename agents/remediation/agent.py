@@ -264,7 +264,7 @@ async def run() -> None:
                         print(e.response.text[:1000], flush=True)
                     print(
                         f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
-                        f"(Projects → your Agent project → Sessions → Outcome Analysis).",
+                        f"(Projects → your Agent project → Sessions → open the Logs view to see the scanner that fired).",
                         flush=True,
                     )
                     return

@@ -53,7 +53,7 @@ You'll see these terms throughout. Definitions are kept short on purpose; we'll 
 | **BYOA** (Bring Your Own Agent) | F5's capability to give existing agents chain-of-thought visibility without rewriting them. | The point of routing every agent's LLM calls through the F5 proxy. |
 | **Chain of thought** | The model's intermediate reasoning steps. | The mind of the agent. The whole lab is about making this visible. |
 | **Agentic Fingerprints** | F5/Calypso's name for the per-session decision trace shown in the UI. | What you actually look at after each run. |
-| **Outcome Analysis** | F5/Calypso's explainability for *why* a guardrail fired. | Module 4 uses it to explain a block in human terms. |
+| **Logs view** | The session detail screen in the Calypso UI that shows which scanner fired and the prompt/response that triggered it. | What you'll open in Module 4 to see *why* a poisoned prompt was blocked. |
 
 ---
 
@@ -1374,13 +1374,13 @@ That distinction is the whole point. Modules 1–3 catch destructive *actions*. 
 
 ### Goal
 
-Configure an input scanner on your Agent project that catches prompt-injection attempts. Re-run a poisoned alert through Triage and watch the request blocked at the proxy. Use **Outcome Analysis** to read F5's explanation of why it blocked.
+Configure an input scanner on your Agent project that catches prompt-injection attempts. Re-run a poisoned alert through Triage and watch the request blocked at the proxy. Open the session in the **Logs view** to see which scanner fired and on what content.
 
 ### What you'll learn
 
 - The difference between **authorization** (Modules 1–3) and **content scanning** (Module 4) — and why a real production stack needs both.
 - How an **input scanner** works in F5 AI Guardrails: it sees the prompt before the LLM does, and either passes it through or blocks the request.
-- **Outcome Analysis**: F5/Calypso's plain-English explanation of *why* a guardrail fired, in terms a non-AI stakeholder can understand. This is the bridge between "it broke" and "it broke for this specific reason."
+- **The session Logs view**: the per-session detail screen in the Calypso UI where the firing scanner is named and the prompt that triggered it is shown. This is the bridge between "it broke" and "it broke for this specific reason." (You'll see two buttons on a session row: a **Fingerprints view** and a **Logs view**. The Logs view is where the guardrail explanation lives.)
 - Why prompt injection is the canonical attack the previous modules can't catch. None of OAuth scopes, capability manifests, or agent cards inspect the *content* of a prompt.
 
 ### New concepts
@@ -1390,12 +1390,12 @@ Configure an input scanner on your Agent project that catches prompt-injection a
 | **Input scanner** | A guardrail that inspects the *request* (system + user prompt + tool definitions) before the proxy forwards it to the upstream LLM. Can be pattern-based, classifier-based, or LLM-based. |
 | **Output scanner** | The mirror image — inspects the *response* the LLM produced before it goes back to the agent. Catches things the input scanner missed plus anything sensitive the model hallucinated. (Out of scope for this module; see Future slice.) |
 | **Prompt injection** | A class of attack where attacker-controlled text in a user prompt tries to override the system prompt's instructions. Classic shape: "Ignore previous instructions and do X instead." |
-| **Outcome Analysis** | F5/Calypso's UI feature that converts a guardrail block into a human-readable explanation: which scanner fired, what it detected, and what it considered destructive. |
+| **Logs view** | The Calypso UI tab on a session row that shows the prompt, the model response (if any), and which scanner fired with what verdict. The "why a block happened" lives here. |
 | **Refusal-in-place** | What the proxy returns when a scanner blocks: the agent gets back a structured error (HTTP 4xx) or a synthetic refusal in the OpenAI-shape response, never the LLM's actual reply. |
 
 ### What changed under the hood
 
-Mostly nothing in the repo — that's the architectural point. The agents now wrap their `chat.completions.create()` calls in `try/except openai.APIStatusError` so a guardrail block surfaces as a clean log line that points the learner at Outcome Analysis. Beyond that, all enforcement logic lives in the F5 platform.
+Mostly nothing in the repo — that's the architectural point. The agents now wrap their `chat.completions.create()` calls in `try/except openai.APIStatusError` so a guardrail block surfaces as a clean log line that points the learner at the session's Logs view. Beyond that, all enforcement logic lives in the F5 platform.
 
 - **`agents/triage/agent.py`** — graceful handling of blocked requests, plus a 200-with-refusal-body fallback for tenants that return refusals in the OpenAI-shape response instead of as 4xx.
 - **`agents/threat_intel/agent.py`** and **`agents/remediation/agent.py`** — same pattern wrapped around their tool-calling loops, so a block on round N exits cleanly instead of throwing.
@@ -1487,22 +1487,25 @@ Expected agent log (HTTP 400 with a structured `cai_error` body):
   }
 }
 [triage] Look up session ...-triage-... in F5 AI Security
-         (Projects → your Agent project → Sessions, then Outcome Analysis)
-         to see why this prompt was refused.
+         (Projects → your Agent project → Sessions → open the Logs view)
+         to see which scanner fired and why this prompt was refused.
 ```
 
 Reading the body: every scanner Calypso ran on the request appears in `scanner_results`, each with its own `outcome` (`passed` or `failed`). The top-level `cai_error.outcome` is `"blocked"` if **any** scanner failed. The `scanner_id` UUIDs map back to specific scanners you can find in the **Guardrails** tab — that's the bridge from the API response to the UI.
 
 The point: **the agent gets a refusal, not a model response.** The LLM never saw the injection.
 
-#### Step 6 — Read Outcome Analysis
+#### Step 6 — Read the session Logs view
 
-Go to **Projects → your Agent project → Sessions**, find the just-blocked run, and open **Outcome Analysis** on it. The platform should explain in plain language:
-- Which scanner fired
-- What pattern / signal it detected
-- What category (prompt injection, jailbreak, etc.) it classified the input as
+Go to **Projects → your Agent project → Sessions** and find the just-blocked run. On that row you'll see two buttons: **Fingerprints view** and **Logs view**. Click **Logs view**. The Logs entries show:
 
-This is the bridge from "the agent failed" to "here is exactly why and which signal we used to decide." Screenshot this view — it's the artifact you take to a non-technical stakeholder when you need to explain why an automated block happened.
+- The prompt that was sent.
+- Which scanner(s) ran and the verdict each returned (passed / failed).
+- The trigger content the failing scanner objected to.
+
+This is the bridge from "the agent failed" to "this exact scanner caught this exact phrase." Screenshot this view — it's the artifact you take to a non-technical stakeholder when you need to explain why an automated block happened.
+
+> The `scanner_id` UUIDs you saw in the agent's HTTP error body (`cai_error.scanner_results`) match the scanner identifiers in the Logs view, so you can correlate the API-level evidence with the UI-level explanation.
 
 #### Step 7 — Confirm legitimate alerts still pass
 
@@ -1547,7 +1550,7 @@ docker compose run --rm \
   threat-intel
 ```
 
-Same deny shape. Same Outcome Analysis trail. The scanner sits in front of every agent that points at the proxy.
+Same deny shape. Same Logs-view trail with the same scanner_id firing. The scanner sits in front of every agent that points at the proxy.
 
 ### Five layers, one stack
 
@@ -1566,7 +1569,7 @@ Module 4's layer is **the only one that can stop a fundamentally novel attack** 
 ### Reflection
 
 1. The same alert that was blocked in Slice B might pass on a different model with stronger native alignment. Whose responsibility is the deny — the platform's, the model's, or both? *(Hint: defense in depth.)*
-2. Outcome Analysis explained the block in human terms. What classes of stakeholder need that explanation, and how often do you think they'll need it?
+2. The Logs view named the firing scanner. What classes of stakeholder need that explanation, and how often do you think they'll need it?
 3. Input scanners catch poisoned **inputs**. What about poisoned *outputs* — the model leaking sensitive data unprompted? *(That's the output-scanner story; preview at the bottom of this module.)*
 4. A scanner that blocks 100% of bad traffic and 30% of legitimate traffic is worse than no scanner at all. Why? What does that imply about how you tune scanners in production?
 
@@ -1574,7 +1577,7 @@ Module 4's layer is **the only one that can stop a fundamentally novel attack** 
 
 - ☐ Slice A: poisoned alert reaches the LLM; the F5 session shows the full poisoned prompt verbatim
 - ☐ Slice B: same alert produces `─── BLOCKED at the proxy ───` in the agent log, never reaches the LLM
-- ☐ Outcome Analysis names the scanner and the detected pattern in human terms
+- ☐ Session Logs view names the firing scanner and shows the prompt content that triggered it
 - ☐ Step 7's benign alert still passes — the scanner isn't over-blocking
 - ☐ Reinforcement #2 shows whether your scanner generalizes beyond pure injection (or where its boundaries are)
 - ☐ You can articulate why this is a different *kind* of layer than Modules 1–3
@@ -1787,5 +1790,5 @@ The lab ends here. The work continues.
 # Where to go after the lab
 
 - The PRD ([`PRD.md`](../PRD.md)) describes the design rationale and what's intentionally out of scope.
-- The [F5 AI Security platform docs](https://docs.aisecurity.f5.com/) cover features we didn't touch (Red Team, more scanners, Outcome Analysis customization).
+- The [F5 AI Security platform docs](https://docs.aisecurity.f5.com/) cover features we didn't touch (Red Team, more scanner types, custom scanner authoring).
 - If you have ideas for a Phase 2 of *this* lab (CI integration, more failure modes, additional model providers), open an issue in the repo.

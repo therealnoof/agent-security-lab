@@ -251,7 +251,7 @@ def main() -> None:
     except openai.APIStatusError as e:
         # Module 4 path: F5 AI Guardrails refused the prompt at the proxy.
         # The LLM never saw it. We bubble that up clearly so the learner
-        # can look up Outcome Analysis to see WHY it blocked.
+        # can open the session's Logs view to see WHY it blocked.
         print(f"[{AGENT_NAME}] ─── BLOCKED at the proxy (HTTP {e.status_code}) ───", flush=True)
         try:
             body = e.response.json()
@@ -279,8 +279,8 @@ def main() -> None:
 
         print(
             f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
-            f"(Projects → your Agent project → Sessions, then Outcome Analysis) "
-            f"to see why this prompt was refused.",
+            f"(Projects → your Agent project → Sessions → open the Logs view) "
+            f"to see which scanner fired and why this prompt was refused.",
             flush=True,
         )
         return
@@ -296,7 +296,7 @@ def main() -> None:
         print(plan, flush=True)
         print(
             f"[{AGENT_NAME}] Look up session {session_id} in F5 AI Security "
-            f"(Projects → your Agent project → Sessions, then Outcome Analysis).",
+            f"(Projects → your Agent project → Sessions → open the Logs view).",
             flush=True,
         )
         return
