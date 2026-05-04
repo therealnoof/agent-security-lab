@@ -90,6 +90,8 @@ This module isolates the **BYOA wiring** from every other moving part. You'll ru
 Open `/home/ubuntu/agent-security-lab/agents/triage/agent.py` in your editor. Don't skim. There are four parts that matter — find each one before running anything.
 
 > **Path note:** on F5 UDF (and most prebuilt lab nodes) the repo lives at `/home/ubuntu/agent-security-lab/`. All file paths in this guide are relative to that root unless otherwise noted; if you cloned to a different directory, prefix accordingly.
+>
+> **No editor on the lab node?** If your instructor pre-staged code-server (browser-based VS Code), it's reachable at **`https://<lab-host>:8443`** — open that, log in with the password you were given, and **File → Open Folder → `/home/ubuntu/agent-security-lab`**. If it's not pre-staged, an instructor can set it up with `sudo bash scripts/install-code-server.sh` (see the README's "Optional — browser-based VS Code" section).
 
 **1.1 Configuration from environment** (top of file, lines 41–54):
 

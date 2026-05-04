@@ -51,6 +51,18 @@ A poisoned alert drives the unhardened Remediation agent to drop a `tickets` tab
 
 > **Setting up your environment** — see [`SETUP.md`](./SETUP.md) for the full topology, hardware/OS/network requirements, and step-by-step setup instructions for both **self-paced learners** and **lab owners/instructors** (per-learner tokens, room WiFi, pre-flight checklist).
 
+## Optional — browser-based VS Code (code-server)
+
+For instructor-led labs where students benefit from a graphical editor instead of SSH + nano, install `code-server` (browser-based VS Code) on the lab node. It auto-starts on boot, listens on `0.0.0.0:8443` over HTTPS with a self-signed cert, and is password-protected.
+
+```bash
+sudo bash scripts/install-code-server.sh
+# or with a fixed password:
+sudo CODE_SERVER_PASSWORD='your-pick' bash scripts/install-code-server.sh
+```
+
+The script prints the access URL and password at the end. Open the URL in a remote browser, accept the cert warning, log in, then **File → Open Folder → `/home/ubuntu/agent-security-lab`**. Make sure inbound TCP `8443` is open in your cloud security group.
+
 ## Reset between runs
 
 To wipe lab state (containers, Postgres tables, Keycloak realm) and start over from Module 0 — preserves your `.env`:
