@@ -62,7 +62,11 @@ CALYPSOAI_OPENAI_API_BASE = os.environ.get("CALYPSOAI_OPENAI_API_BASE")
 CALYPSOAI_MODEL = os.environ.get("CALYPSOAI_MODEL", "gpt-4o-mini")
 
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8000/sse")
-MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "8"))
+# Default 12 to accommodate reasoning models (Grok-4-reasoning,
+# o-series, etc.) that introspect heavily before acting. Faster
+# models typically converge in 2-4. Override per-run with
+# MAX_ITERATIONS=N if you want to constrain or extend.
+MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "12"))
 
 # OAuth (Module 1 Slice B). When KEYCLOAK_ISSUER is set we fetch a
 # client_credentials token before connecting to MCP and present it as
@@ -328,12 +332,38 @@ async def run() -> None:
                         "content": result_text,
                     })
 
+            # Exhausted the budget without the model wrapping up.
+            # Force one last call with no tools available so the
+            # model has to produce a final answer instead of asking
+            # for another tool. Cleaner UX than just aborting.
             print(
-                f"[{AGENT_NAME}] !!! reached MAX_ITERATIONS={MAX_ITERATIONS} "
-                "without a final report — aborting.",
+                f"[{AGENT_NAME}] !!! reached MAX_ITERATIONS={MAX_ITERATIONS}; "
+                "forcing final summary (no tools) ───",
                 flush=True,
             )
-            sys.exit(2)
+            try:
+                final_resp = client.chat.completions.create(
+                    model=CALYPSOAI_MODEL,
+                    messages=messages + [{
+                        "role": "user",
+                        "content": (
+                            "You have used the maximum number of tool-calling rounds. "
+                            "Stop calling tools and produce your final JSON report now, "
+                            "summarizing what you did and what you learned, even if "
+                            "the result is partial."
+                        ),
+                    }],
+                )
+                if hasattr(final_resp, "choices") and final_resp.choices:
+                    print(f"[{AGENT_NAME}] ─── final report (forced) ───", flush=True)
+                    print(final_resp.choices[0].message.content or "(no content)", flush=True)
+            except Exception as e:
+                print(f"[{AGENT_NAME}] forced-summary call failed: {e}", flush=True)
+            print(
+                f"[{AGENT_NAME}] ─── done. Look up session {session_id} in F5 AI Security ───",
+                flush=True,
+            )
+            return
 
 
 if __name__ == "__main__":

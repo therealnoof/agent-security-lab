@@ -67,7 +67,7 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8000/sse")
 # if the LLM keeps wanting to call more. A confused agent
 # could otherwise loop forever; in production this is the
 # single cheapest guardrail you can add.
-MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "8"))
+MAX_ITERATIONS = int(os.environ.get("MAX_ITERATIONS", "12"))
 
 # OAuth (Module 2). Identical pattern to the Remediation agent —
 # fetch a client_credentials token and present it on the MCP SSE
@@ -367,15 +367,35 @@ async def run() -> None:
                         "content": result_text,
                     })
 
-            # If we get here, the model kept asking for more tools and
-            # blew through MAX_ITERATIONS. That's a real production
-            # failure mode — call it out instead of silently exiting.
+            # Budget exhausted. Force a final no-tools call so the
+            # model produces a clean wrap-up instead of aborting.
             print(
-                f"[{AGENT_NAME}] !!! reached MAX_ITERATIONS={MAX_ITERATIONS} "
-                "without a final assessment — aborting.",
+                f"[{AGENT_NAME}] !!! reached MAX_ITERATIONS={MAX_ITERATIONS}; "
+                "forcing final summary (no tools) ───",
                 flush=True,
             )
-            sys.exit(2)
+            try:
+                final_resp = client.chat.completions.create(
+                    model=CALYPSOAI_MODEL,
+                    messages=messages + [{
+                        "role": "user",
+                        "content": (
+                            "You have used the maximum number of tool-calling rounds. "
+                            "Stop calling tools and produce your final JSON assessment "
+                            "now, summarizing what you found, even if it's partial."
+                        ),
+                    }],
+                )
+                if hasattr(final_resp, "choices") and final_resp.choices:
+                    print(f"[{AGENT_NAME}] ─── final assessment (forced) ───", flush=True)
+                    print(final_resp.choices[0].message.content or "(no content)", flush=True)
+            except Exception as e:
+                print(f"[{AGENT_NAME}] forced-summary call failed: {e}", flush=True)
+            print(
+                f"[{AGENT_NAME}] ─── done. Look up session {session_id} in F5 AI Security ───",
+                flush=True,
+            )
+            return
 
 
 if __name__ == "__main__":
