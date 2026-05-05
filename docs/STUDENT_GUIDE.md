@@ -321,7 +321,7 @@ This is Module 1 in miniature: a poisoned user prompt that aims a real agent at 
 
 ## Reflection
 
-Spend two minutes on these questions before moving on. Don't write essays — one sentence each.
+Spend a couple of minutes on these questions.
 
 1. Without F5 BYOA, what *would* you have known about that second run? (i.e., from your own logs only.)
 2. The system prompt was unchanged between runs. So why did the plan change?
