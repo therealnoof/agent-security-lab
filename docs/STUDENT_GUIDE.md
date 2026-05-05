@@ -27,9 +27,16 @@ If you get stuck, the [Troubleshooting](../SETUP.md#a6-common-self-paced-gotchas
 
 ## Before you start
 
-1. Complete [`SETUP.md`](../SETUP.md) — install Docker, fill in `.env`, validate Triage.
-2. Have the F5 AI Security UI (`https://www.us1.calypsoai.app` for the lab tenant) open in a browser tab, signed in. **The path you'll use repeatedly** is **Projects → your Agent project → Sessions**. (Same project also holds your API tokens, guardrails, and provider connections.)
-3. Optional but recommended: complete the [`mcp-server-lab`](https://github.com/therealnoof/mcp-server-lab) Phase 1 lab first. This lab reuses its SOC tools and assumes you've seen a single agent in action.
+Most students will work from a pre-staged lab environment (e.g., F5 UDF) where Docker, the repo, and all images are already on the box. **The only setup you actually need to gather:**
+
+1. **Access to an F5 AI Security (CalypsoAI) tenant** — the URL where you'll be working (e.g., `https://www.us1.calypsoai.app`). Have it open in a browser tab, signed in. **The path you'll use repeatedly** is **Projects → your Agent project → Sessions**. (Same project also holds your API tokens, guardrails, and provider connections.)
+2. **An Agentic project in that tenant** — instructor will usually pre-create one. If you're self-paced, see the click-by-click in **Module 0 → Prerequisites → "Setting up your Agent project in Calypso"** below.
+3. **An API token** issued from that Agent project — what you'll paste into `CALYPSOAI_TOKEN` in `.env`.
+4. **The name of your provider and model** — if you're using the lab's default `Grok-4-20-Reasoning` provider with `grok-4.20-reasoning`, the example `.env` below already has those values; just paste your token and you're done. If your tenant has a different provider configured, get that name and model id from your instructor or the Calypso Connections tab.
+
+Optional reading:
+- Full environment install (only if you're standing up the lab on your own infrastructure rather than using a pre-staged node): [`SETUP.md`](../SETUP.md).
+- Recommended companion: [`mcp-server-lab`](https://github.com/therealnoof/mcp-server-lab) Phase 1. This lab reuses its SOC tools and assumes you've seen a single agent in action.
 
 ---
 
