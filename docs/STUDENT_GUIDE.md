@@ -193,6 +193,8 @@ The big triple-quoted string that defines the Triage agent's role, lists the all
 
 ## Step 2 — Configure your `.env`
 
+> **On the prebuilt lab (UDF)?** `.env` is already in place with the proxy URL and model id pre-filled for the lab's default Grok provider — **the only thing you need to add is your `CALYPSOAI_TOKEN`** from your Agent project. Open `/home/ubuntu/agent-security-lab/.env` in Coder, paste the token into the `CALYPSOAI_TOKEN=` line, save, and skip ahead to **Step 3**. The rest of this step (provider discovery, populated example, etc.) is reference material only.
+
 If you finished `SETUP.md` you've done this. If not, the short version:
 
 ```bash
