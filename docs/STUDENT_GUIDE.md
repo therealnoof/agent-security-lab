@@ -127,7 +127,9 @@ If your tenant uses a different region (e.g., not `us1`), a different provider n
 
 ## Step 1 — Read the agent before you run it
 
-Open `/home/ubuntu/agent-security-lab/agents/triage/agent.py` in your editor. Don't skim. There are four parts that matter — find each one before running anything.
+Open `/home/ubuntu/agent-security-lab/agents/triage/agent.py` in your editor. **The recommended editor is Coder** (browser-based VS Code), which is pre-staged on the lab node and reachable from the **Access Methods → Coder** entry on your UDF lab session. Once you're in Coder, **File → Open Folder → `/home/ubuntu/agent-security-lab`** and navigate to the file. Details on logging in are in the callout below.
+
+Don't skim. There are four parts that matter — find each one before running anything.
 
 > **Path note:** on F5 UDF (and most prebuilt lab nodes) the repo lives at `/home/ubuntu/agent-security-lab/`. All file paths in this guide are relative to that root unless otherwise noted; if you cloned to a different directory, prefix accordingly.
 >
