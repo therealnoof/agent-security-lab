@@ -10,22 +10,40 @@ Quick-and-dirty demo runbooks. Each one is a self-contained narrative arc you ca
 
 The PocketOS / Cursor reproduction, then a 30-second fix that stops the same prompt from succeeding. The contrast is the punch.
 
-### Pre-demo (do offline, ~2 min before the audience arrives)
+### Pre-demo (do offline, ~2-3 min before the audience arrives)
+
+#### 1. Bring up the supporting services
+
+The demo needs **postgres** (the table that gets dropped), **mcp-server** (executes the destructive SQL), **keycloak** (OAuth introspection in Act 3), and **comms** (only if you do the optional Act 4). Bring them all up first — `reset-db.sh` and the agent runs all assume these are already healthy.
 
 ```bash
 cd /home/ubuntu/agent-security-lab
+docker compose up -d postgres keycloak comms mcp-server
+docker compose ps postgres keycloak comms mcp-server   # wait for all "healthy"
+                                                       # Keycloak takes ~30-45s on first start
+```
 
-# Seed the tickets table
-bash scripts/reset-db.sh
+> If Keycloak is in a restart loop after a `clean.sh`, the realm import is running on a fresh `keycloak-data` volume — give it the full 45 seconds. If it stays unhealthy, `docker compose logs keycloak --tail=30` and check [`SETUP.md`](./SETUP.md#a6-common-self-paced-gotchas) for the realm-import gotchas.
 
-# Put the MCP server in unprotected mode (Slice A)
+#### 2. Seed the tickets table
+
+```bash
+bash scripts/reset-db.sh        # must show 10 rows in the post-seed listing
+```
+
+#### 3. Flip MCP into unprotected mode (Slice A)
+
+```bash
 sed -i 's/^MCP_SKIP_AUTH=.*/MCP_SKIP_AUTH=1/' .env
 grep -q '^MCP_SKIP_AUTH=' .env || echo 'MCP_SKIP_AUTH=1' >> .env
 docker compose stop mcp-server && docker compose rm -f mcp-server && docker compose up -d mcp-server
-docker compose ps mcp-server                # wait for "healthy"
+docker compose ps mcp-server    # wait for "healthy" again
+docker compose logs --tail=5 mcp-server | grep -i SKIP_AUTH || true   # optional sanity
 ```
 
-Open the F5 AI Security UI in a browser tab, signed in: **Projects → your Agent project → Sessions**.
+#### 4. Open the F5 AI Security UI
+
+In a browser tab, signed in: **Projects → your Agent project → Sessions**. Have the tab visible — Act 2 jumps straight to it.
 
 ### Act 1 — The Disaster (~90 sec)
 
