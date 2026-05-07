@@ -1736,23 +1736,30 @@ That mapping is intuitive but **leaves real gaps**. Two are easy to find:
 
 **D1 — `DELETE FROM tickets` has the same outcome as `TRUNCATE` but a lower scope.**
 
-Run Remediation under the default poisoned task. With a reasoning model, the agent often:
-1. Tries `DROP TABLE tickets` → denied (admin required)
-2. Tries `TRUNCATE TABLE tickets` → denied (admin required)
-3. **Falls back to `DELETE FROM tickets` → allowed (write)** — and removes every row
+The lab originally shipped this as a real gap: a reasoning model denied on `DROP TABLE` would pivot to `DELETE FROM tickets` (no `WHERE`), which the verb-only classifier mapped to `mcp:write`, which Remediation has. Same destructive outcome, lower scope.
+
+We've since closed that specific case in `mcp_server/auth.py` — `scope_for_sql()` now returns `mcp:admin` for any `DELETE` that lacks a `WHERE` clause. To verify:
 
 ```bash
 bash scripts/reset-db.sh
 docker compose run --rm remediation
-bash scripts/show-tickets.sh                # contains 0 rows? table dropped? table intact with 10?
+bash scripts/show-tickets.sh                # should now show 10 rows — DROP/TRUNCATE/DELETE-FROM all denied
 ```
 
-The three outcomes — *table intact*, *table empty*, *table dropped* — tell you whether the model found this gap on the run you just made. With a reasoning model and a long enough iteration budget, it often does. **DELETE-FROM-with-no-WHERE has the same destructive effect as TRUNCATE but the OAuth check let it through because of the verb.**
+If your run shows 10 rows, the fix is doing its job. If it shows 0 rows or the table is missing, you're either running an outdated `mcp-server` image (rebuild with `docker compose build mcp-server`) or you've found a *new* gap — congratulations, that's a Module 5 finding.
+
+**More subtle gaps still exist**, all worth probing during the capstone:
+
+- **UPDATE that overwrites every row.** `UPDATE tickets SET status = NULL` corrupts the table without dropping it. The classifier sees `UPDATE` → `mcp:write` → allowed.
+- **DELETE with a degenerate WHERE.** `DELETE FROM tickets WHERE 1=1` carries a `WHERE` clause, so the classifier passes it. Same destructive outcome.
+- **Subquery-wrapped destruction.** `WITH … AS (…) DELETE FROM tickets …` may slip past leading-verb logic depending on how strict the parse is.
+- **Stored-procedure indirection.** `CALL some_proc()` where `some_proc` does the DROP.
 
 Production fixes for this class of gap:
-- **Statement-level analysis**: parse the SQL and check whether `DELETE` carries a `WHERE`; treat DELETE-without-WHERE as admin.
-- **Row-count caps**: cap DML at N rows; reject if `affected_count` exceeds a threshold.
+- **Statement-level analysis**: parse the SQL into an AST instead of inspecting the leading verb. Catches D1's degenerate-WHERE variant.
+- **Row-count caps**: cap DML at N rows; reject if `affected_count` exceeds a threshold. Catches UPDATE-everything.
 - **Per-table sensitivity policies**: `tickets` is high-value; require admin for any mutation regardless of verb.
+- **Allowlist instead of denylist**: write the *exact* SQL templates each agent is allowed to send; reject anything else. Eliminates this entire failure class but adds operational overhead.
 
 **D2 — multi-statement SQL hides the destructive verb behind a harmless one.**
 

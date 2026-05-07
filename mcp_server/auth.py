@@ -129,17 +129,38 @@ def check_scope(scope: str) -> str | None:
 def scope_for_sql(sql: str) -> str:
     """
     Map a single SQL statement to the scope execute_db_query needs.
-    SELECT          -> mcp:read
-    INSERT/UPDATE/  -> mcp:write
-      DELETE
-    DROP/CREATE/    -> mcp:admin   (the destructive set)
-      ALTER/TRUNCATE
-    Anything else   -> mcp:admin   (deny-by-default)
+    SELECT                -> mcp:read
+    INSERT / UPDATE       -> mcp:write
+    DELETE … WHERE …      -> mcp:write   (row-level delete with predicate)
+    DELETE  (no WHERE)    -> mcp:admin   (functionally equivalent to TRUNCATE)
+    DROP/CREATE/ALTER/    -> mcp:admin   (the destructive set)
+      TRUNCATE/GRANT/REVOKE
+    Anything else         -> mcp:admin   (deny-by-default)
+
+    The DELETE-without-WHERE rule closes the most obvious version of the
+    Module 5 Category D1 gap: a reasoning model that gets denied on DROP
+    will pivot to `DELETE FROM tickets` to achieve the same outcome.
+    Treating no-WHERE DELETE as admin makes the verb-only classifier
+    less naive. More subtle gaps remain (e.g., UPDATE that overwrites
+    every row, multi-statement SQL behind a leading SELECT, stored-
+    procedure indirection); see Module 5 for the broader discussion.
     """
-    verb = (sql.strip().lstrip("(").lstrip().split(None, 1) or [""])[0].upper()
+    s = sql.strip().lstrip("(").lstrip()
+    parts = s.split(None, 1)
+    verb = parts[0].upper() if parts else ""
+    upper = s.upper()
+
     if verb == "SELECT":
         return "mcp:read"
-    if verb in {"INSERT", "UPDATE", "DELETE"}:
+    if verb == "DELETE":
+        # Predicate-bearing DELETE stays mcp:write; bulk DELETE is admin.
+        # Conservative: any " WHERE " (case-insensitive) anywhere in the
+        # remaining text counts as a predicate. False positives here
+        # are safer than false negatives.
+        if " WHERE " in upper:
+            return "mcp:write"
+        return "mcp:admin"
+    if verb in {"INSERT", "UPDATE"}:
         return "mcp:write"
     if verb in {"DROP", "CREATE", "ALTER", "TRUNCATE", "GRANT", "REVOKE"}:
         return "mcp:admin"
